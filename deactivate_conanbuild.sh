@@ -1,1 +1,0 @@
-. "/Users/samsonhu/network-monitor/deactivate_conanbuildenv-release-armv8.sh"

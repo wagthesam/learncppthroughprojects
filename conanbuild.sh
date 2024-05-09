@@ -1,1 +1,0 @@
-. "/Users/samsonhu/network-monitor/conanbuildenv-release-armv8.sh"
