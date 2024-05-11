@@ -1,0 +1,1 @@
+. "/Users/samsonhu/network-monitor/build/Release/generators/conanrunenv-release-armv8.sh"

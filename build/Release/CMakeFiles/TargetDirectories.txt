@@ -1,0 +1,3 @@
+/Users/samsonhu/network-monitor/build/Release/CMakeFiles/network-monitor.dir
+/Users/samsonhu/network-monitor/build/Release/CMakeFiles/edit_cache.dir
+/Users/samsonhu/network-monitor/build/Release/CMakeFiles/rebuild_cache.dir
