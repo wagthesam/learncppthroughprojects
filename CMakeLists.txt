@@ -5,7 +5,6 @@ project(network-monitor)
 # Dependencies
 # If dependencies are managed with conan, we prepend the current build folder
 # to the CMake module path, where CMake looks for dependencies.
-find_package(ZLIB REQUIRED)
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
 
 set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
