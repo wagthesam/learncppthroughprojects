@@ -7,13 +7,18 @@ project(network-monitor)
 # to the CMake module path, where CMake looks for dependencies.
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
 
-set(SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp")
+set(SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp")
 
 add_executable(network-monitor ${SOURCES})
 target_compile_features(network-monitor
     PRIVATE
         cxx_std_17
 )
+target_include_directories(network-monitor
+    PRIVATE
+    src)
 target_link_libraries(network-monitor
     PRIVATE
         ${Boost_LIBRARIES}

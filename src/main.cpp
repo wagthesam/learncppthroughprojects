@@ -1,93 +1,74 @@
+#include "websocket-client.h"
+
 #include <boost/asio.hpp>
-#include <boost/beast.hpp>
+
 #include <iostream>
+#include <string>
 
-using tcp = boost::asio::ip::tcp;
-
-void Log(const std::string& ref, const boost::system::error_code& ec)
-{
-	std::cout << ref << " > "
-			  << (ec ? "Error: " : "OK!")
-			  << (ec ? ec.message() : "")
-			  << std::endl;
-}
-
-void OnWrite(
-	boost::beast::websocket::stream<boost::beast::tcp_stream>& ws,
-	boost::beast::flat_buffer& rBuffer,
-	const boost::system::error_code& ec
-) {
-	if (ec) {
-		Log("OnWrite", ec);
-		return;
-	}
-	ws.read(rBuffer);
-	std::cout << boost::beast::make_printable(rBuffer.data()) << std::endl;
-	ws.close(boost::beast::websocket::close_code::normal);
-}
-
-void OnHandshake(
-	boost::beast::websocket::stream<boost::beast::tcp_stream>& ws,
-	const boost::asio::const_buffer& wBuffer,
-	boost::beast::flat_buffer& rBuffer,
-	const boost::system::error_code& ec
-) {
-	if (ec) {
-		Log("OnHandshake", ec);
-		return;
-	}
-	ws.text(true);
-	ws.async_write(wBuffer, [&ws, &rBuffer](auto ec, auto bytes_transferred){
-		OnWrite(ws, rBuffer, ec);
-	});
-}
-
-void OnConnect(
-	boost::beast::websocket::stream<boost::beast::tcp_stream>& ws,
-	const std::string& url,
-	const std::string& endpoint,
-	const boost::asio::const_buffer& wBuffer,
-	boost::beast::flat_buffer& rBuffer,
-	const boost::system::error_code& ec 
-) {
-	if (ec) {
-		Log("OnConnect", ec);
-		return;
-	}
-	ws.async_handshake(
-		url,
-		endpoint,
-		[&ws, &wBuffer, &rBuffer](auto ec){
-			OnHandshake(ws, wBuffer, rBuffer, ec);
-		});
-}
+using NetworkMonitor::WebSocketClient;
 
 int main()
 {
-	const std::string url = "ltnm.learncppthroughprojects.com";
-	const std::string port = "80";
-	const std::string endpoint = "/echo";
-	std::cerr << "start:" << std::this_thread::get_id() << std::endl;
-	boost::asio::io_context ioc {};
-	tcp::socket socket{boost::asio::make_strand(ioc)};
+    // Connection targets
+    const std::string url {"ltnm.learncppthroughprojects.com"};
+    const std::string endpoint {"/echo"};
+    const std::string port {"80"};
+    const std::string message {"Hello WebSocket"};
 
-	boost::system::error_code ec {};
-	tcp::resolver resolver {ioc};
-	auto resolverIt {resolver.resolve(url, port, ec)};
-	if (ec) {
-		Log("main", ec);
-		return -1;
-	}
-	boost::beast::websocket::stream<boost::beast::tcp_stream> ws{std::move(socket)};
-	const std::string msg = "Hello";
-	auto wBuffer = boost::asio::const_buffer(msg.data(), msg.size());
-	boost::beast::flat_buffer rBuffer;
-	ws.next_layer().async_connect(
-		*resolverIt,
-		[&ws, &url, &endpoint, &wBuffer, &rBuffer](auto ec) {
-			OnConnect(ws, url, endpoint, wBuffer, rBuffer, ec);
-		}
-	);
-	ioc.run();
-	return 0;
+    // Always start with an I/O context object.
+    boost::asio::io_context ioc {};
+
+    // The class under test
+    WebSocketClient client {url, endpoint, port, ioc};
+
+    // We use these flags to check that the connection, send, receive functions
+    // work as expected.
+    bool connected {false};
+    bool messageSent {false};
+    bool messageReceived {false};
+    bool messageMatches {false};
+    bool disconnected {false};
+
+    // Our own callbacks
+    auto onSend {[&messageSent](auto ec) {
+        messageSent = !ec;
+    }};
+    auto onConnect {[&client, &connected, &onSend, &message](auto ec) {
+        connected = !ec;
+        if (!ec) {
+            client.Send(message, onSend);
+        }
+    }};
+    auto onClose {[&disconnected](auto ec) {
+        disconnected = !ec;
+    }};
+    auto onReceive {[&client,
+                      &onClose,
+                      &messageReceived,
+                      &messageMatches,
+                      &message](auto ec, auto received) {
+        messageReceived = !ec;
+        messageMatches = message == received;
+        client.Close(onClose);
+    }};
+
+    // We must call io_context::run for asynchronous callbacks to run.
+    client.Connect(onConnect, onReceive);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    bool ok {
+        connected &&
+        messageSent &&
+        messageReceived &&
+        messageMatches &&
+        disconnected
+    };
+    if (ok) {
+        std::cout << "OK!!" << std::endl;
+        return 0;
+    } else {
+        std::cerr << "Test failed" << std::endl;
+        return 1;
+    }
 }
