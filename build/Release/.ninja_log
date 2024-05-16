@@ -1,16 +1,9 @@
 # ninja log v6
-8701	8815	1715706365004250595	network-monitor	6c5ae01ccb909b9
-17	8701	1715706356319797729	CMakeFiles/network-monitor.dir/src/main.cpp.o	9f3dc01f06995465
-19	150	1715825064624151661	build.ninja	3009400013112f44
-25	1673	1715825215993259453	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-27	1714	1715825316344736959	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-21	1705	1715825475527299540	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-23	1563	1715825745330458920	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-20	1695	1715825865631925747	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-22	1588	1715825949695779213	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-23	1656	1715826285251427753	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-18	12894	1715827380818051672	CMakeFiles/network-monitor.dir/src/websocket-client.cpp.o	7a828d8572e4bd0f
-12894	13037	1715827393694049099	network-monitor	4e9d54995ce2535
+1765	1875	1715841507796856430	network-monitor-tests	1dc6ad40bb99a608
+11719	11830	1715834793459869602	libnetwork-monitor.a	db8285d6dd3a3af2
+24	1765	1715841506055883334	CMakeFiles/network-monitor-tests.dir/tests/websocket-client.cpp.o	a6069b1beeabb9e1
+20	11719	1715834781761300567	CMakeFiles/network-monitor.dir/src/websocket-client.cpp.o	f94188773e41d04a
+6	619	1715841404086301305	CMakeFiles/network-monitor-tests.dir/tests/main.cpp.o	814460dba988ed9e
+5	131	1715841870223033142	build.ninja	3009400013112f44
 24	1702	1715827432679765299	CMakeFiles/network-monitor.dir/src/main.cpp.o	ead94e417f0f1e43
-24	11616	1715827432680618971	CMakeFiles/network-monitor.dir/src/websocket-client.cpp.o	7a828d8572e4bd0f
 11616	11665	1715827444272631569	network-monitor	4e9d54995ce2535

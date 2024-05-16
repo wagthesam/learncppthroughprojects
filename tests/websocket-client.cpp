@@ -1,13 +1,16 @@
-#include "websocket-client.h"
+#include "network-monitor/websocket-client.h"
 
 #include <boost/asio.hpp>
+#include <boost/test/unit_test.hpp>
 
 #include <iostream>
 #include <string>
 
 using NetworkMonitor::WebSocketClient;
 
-int main()
+BOOST_AUTO_TEST_SUITE(network_monitor);
+
+BOOST_AUTO_TEST_CASE(class_WebSocketClient)
 {
     // Connection targets
     const std::string url {"ltnm.learncppthroughprojects.com"};
@@ -64,11 +67,7 @@ int main()
         messageMatches &&
         disconnected
     };
-    if (ok) {
-        std::cout << "OK!!" << std::endl;
-        return 0;
-    } else {
-        std::cerr << "Test failed" << std::endl;
-        return 1;
-    }
+    BOOST_TEST(ok);
 }
+
+BOOST_AUTO_TEST_SUITE_END();

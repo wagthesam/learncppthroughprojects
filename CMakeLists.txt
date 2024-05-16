@@ -6,20 +6,42 @@ project(network-monitor)
 # If dependencies are managed with conan, we prepend the current build folder
 # to the CMake module path, where CMake looks for dependencies.
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
-
-set(SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp")
-
-add_executable(network-monitor ${SOURCES})
+set(LIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
+)
+add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
     PRIVATE
         cxx_std_17
 )
+
+set(NETWORK_MONITOR_INC "inc")
 target_include_directories(network-monitor
-    PRIVATE
-    src)
+    PUBLIC
+    ${NETWORK_MONITOR_INC})
 target_link_libraries(network-monitor
-    PRIVATE
+    PUBLIC
         ${Boost_LIBRARIES}
 )
+
+enable_testing()
+
+set(TEST_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp")
+
+add_executable(network-monitor-tests ${TEST_SOURCES})
+target_compile_features(network-monitor-tests
+    PRIVATE
+        cxx_std_17
+)
+target_include_directories(network-monitor-tests
+    PRIVATE
+    ${NETWORK_MONITOR_INC})
+target_link_libraries(network-monitor-tests
+    PRIVATE
+        network-monitor
+        ${Boost_LIBRARIES}
+)
+
+add_test(NAME websocket-client-test COMMAND ./network-monitor-tests)
