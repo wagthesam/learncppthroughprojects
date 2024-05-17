@@ -2,6 +2,8 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <boost/beast/ssl.hpp>
+#include <openssl/ssl.h>
 
 #include <iostream>
 #include <utility>
@@ -11,12 +13,16 @@ namespace NetworkMonitor {
         const std::string& url,
         const std::string& endpoint,
         const std::string& port,
-        boost::asio::io_context& ioc) : 
-        url_(url),
+        boost::asio::io_context& ioc,
+        boost::asio::ssl::context& ctx
+    ) : url_(url),
         endpoint_(endpoint),
         port_(port),
         resolver_(boost::asio::make_strand(ioc)),
-        ws_(boost::asio::make_strand(ioc)) {}
+        ws_(boost::beast::ssl_stream<boost::beast::tcp_stream>(
+            boost::asio::make_strand(ioc),
+            ctx)) {
+    }
 
     WebSocketClient::~WebSocketClient() {
         if (ws_.is_open()) {
@@ -55,7 +61,7 @@ namespace NetworkMonitor {
             return;
         }
 
-        ws_.next_layer().async_connect(
+        boost::beast::get_lowest_layer(ws_).async_connect(
             *results,
             [this](auto&& ec) {
                 OnConnect(std::forward<decltype(ec)>(ec));
@@ -66,6 +72,27 @@ namespace NetworkMonitor {
         const boost::system::error_code& ec) {
         if (ec) {
             Log("OnConnect", ec);
+            if (onConnect_) {
+                onConnect_(ec);
+                onDisconnect_(ec);
+            }
+            return;
+        }
+        boost::beast::get_lowest_layer(ws_).expires_never();
+        ws_.set_option(boost::beast::websocket::stream_base::timeout::suggested(
+            boost::beast::role_type::client
+        ));
+        ws_.next_layer().async_handshake(
+            boost::asio::ssl::stream_base::client,
+            [this](auto&& ec) {
+                OnTlsHandshake(std::forward<decltype(ec)>(ec));
+            });
+    }
+
+    void WebSocketClient::OnTlsHandshake(
+        const boost::system::error_code& ec) {
+        if (ec) {
+            Log("OnTlsHandshake", ec);
             if (onConnect_) {
                 onConnect_(ec);
                 onDisconnect_(ec);

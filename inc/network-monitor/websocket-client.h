@@ -2,6 +2,8 @@
 
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <boost/asio/ssl/context.hpp>
+#include <boost/beast/ssl/ssl_stream.hpp>
 
 namespace NetworkMonitor {
 
@@ -20,11 +22,13 @@ public:
      *  \param ioc      The io_context object. The user takes care of calling
      *                  ioc.run().
      */
+
     WebSocketClient(
         const std::string& url,
         const std::string& endpoint,
         const std::string& port,
-        boost::asio::io_context& ioc
+        boost::asio::io_context& ioc,
+        boost::asio::ssl::context& ctx
     );
 
     /*! \brief Destructor.
@@ -74,6 +78,7 @@ private:
     void OnResolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::results_type results);
     void OnConnect(const boost::system::error_code& ec);
     void OnHandshake(const boost::system::error_code& ec);
+    void OnTlsHandshake(const boost::system::error_code& ec);
     void OnRead(
         const boost::system::error_code& ec,
         std::size_t bytes_transferred);
@@ -83,7 +88,7 @@ private:
     const std::string port_;
     boost::asio::ip::tcp::resolver resolver_;
     boost::beast::flat_buffer buffer_;
-    boost::beast::websocket::stream<boost::beast::tcp_stream> ws_;
+    boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>> ws_;
 
     std::function<void (boost::system::error_code)> onConnect_;
     std::function<void (boost::system::error_code,

@@ -6,6 +6,7 @@ project(network-monitor)
 # If dependencies are managed with conan, we prepend the current build folder
 # to the CMake module path, where CMake looks for dependencies.
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
+find_package(OpenSSL 3.2.1 REQUIRED COMPONENTS system)
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
 )
@@ -22,6 +23,7 @@ target_include_directories(network-monitor
 target_link_libraries(network-monitor
     PUBLIC
         ${Boost_LIBRARIES}
+        openssl::openssl
 )
 
 enable_testing()
@@ -42,6 +44,10 @@ target_link_libraries(network-monitor-tests
     PRIVATE
         network-monitor
         ${Boost_LIBRARIES}
+)
+target_compile_definitions(network-monitor-tests
+    PRIVATE
+        TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
 )
 
 add_test(NAME websocket-client-test COMMAND ./network-monitor-tests)

@@ -10,7 +10,8 @@ class ConanPackage(ConanFile):
     generators = "CMakeToolchain", "CMakeDeps"
 
     requires = [
-        ('boost/1.85.0')
+        ('boost/1.85.0'),
+        ('openssl/3.2.1')
     ]
 
     default_options = {
