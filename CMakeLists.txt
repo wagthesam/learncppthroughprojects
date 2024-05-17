@@ -7,29 +7,44 @@ project(network-monitor)
 # to the CMake module path, where CMake looks for dependencies.
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
 find_package(OpenSSL 3.2.1 REQUIRED COMPONENTS system)
+find_package(CURL 8.6.0 REQUIRED)
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
 )
+
 add_library(network-monitor STATIC ${LIB_SOURCES})
 target_compile_features(network-monitor
     PRIVATE
         cxx_std_17
 )
-
-set(NETWORK_MONITOR_INC "inc")
+set(INC "inc")
 target_include_directories(network-monitor
     PUBLIC
-    ${NETWORK_MONITOR_INC})
+    ${INC})
 target_link_libraries(network-monitor
     PUBLIC
         ${Boost_LIBRARIES}
         openssl::openssl
 )
 
+add_library(file-downloader STATIC "${CMAKE_CURRENT_SOURCE_DIR}/src/file-downloader.cpp")
+target_compile_features(file-downloader
+    PRIVATE
+        cxx_std_17
+)
+target_include_directories(file-downloader
+    PUBLIC
+    ${INC})
+target_link_libraries(file-downloader
+    PRIVATE
+        CURL::libcurl
+)
+
 enable_testing()
 
 set(TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp")
 
 add_executable(network-monitor-tests ${TEST_SOURCES})
@@ -42,8 +57,9 @@ target_include_directories(network-monitor-tests
     ${NETWORK_MONITOR_INC})
 target_link_libraries(network-monitor-tests
     PRIVATE
-        network-monitor
         ${Boost_LIBRARIES}
+        network-monitor
+        file-downloader
 )
 target_compile_definitions(network-monitor-tests
     PRIVATE
