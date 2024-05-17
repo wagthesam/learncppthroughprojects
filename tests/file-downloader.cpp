@@ -2,12 +2,11 @@
 
 #include <boost/asio.hpp>
 #include <boost/test/unit_test.hpp>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
 #include <string>
-
-using NetworkMonitor::DownloadFile;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -21,7 +20,7 @@ BOOST_AUTO_TEST_CASE(file_downloader)
     };
 
     // Download the file.
-    bool downloaded {DownloadFile(fileUrl, destination, TESTS_CACERT_PEM)};
+    bool downloaded {NetworkMonitor::DownloadFile(fileUrl, destination, TESTS_CACERT_PEM)};
     BOOST_CHECK(downloaded);
     BOOST_CHECK(std::filesystem::exists(destination));
 
@@ -44,6 +43,22 @@ BOOST_AUTO_TEST_CASE(file_downloader)
 
     // Clean up.
     std::filesystem::remove(destination);
+}
+
+BOOST_AUTO_TEST_CASE(parse_json_file)
+{
+    std::filesystem::path jsonFile{TESTS_NETWORK_LAYOUT_JSON};
+    nlohmann::json parsedFile = NetworkMonitor::ParseJsonFile(jsonFile);
+    BOOST_CHECK(parsedFile.is_object());
+    BOOST_CHECK(parsedFile.contains("lines"));
+    BOOST_CHECK(parsedFile.at("lines").is_array());
+    BOOST_CHECK(parsedFile.at("lines").size() > 0);
+    BOOST_CHECK(parsedFile.contains("stations"));
+    BOOST_CHECK(parsedFile.at("stations").is_array());
+    BOOST_CHECK(parsedFile.at("stations").size() > 0);
+    BOOST_CHECK(parsedFile.contains("travel_times"));
+    BOOST_CHECK(parsedFile.at("travel_times").is_array());
+    BOOST_CHECK(parsedFile.at("travel_times").size() > 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

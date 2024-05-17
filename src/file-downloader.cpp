@@ -1,7 +1,11 @@
+#include <network-monitor/file-downloader.h>
+
+#include <nlohmann/json.hpp>
+#include <curl/curl.h>
+
 #include <filesystem>
 #include <string>
-
-#include <curl/curl.h>
+#include <fstream>
 
 namespace {
     size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -42,6 +46,22 @@ bool DownloadFile(
         return res == CURLE_OK;
     }
     return false;
+}
+
+nlohmann::json ParseJsonFile(
+    const std::filesystem::path& source
+)
+{
+    nlohmann::json parsed {};
+    if (!std::filesystem::exists(source)) {
+        return parsed;
+    }
+    try {
+        std::ifstream file {source};
+        file >> parsed;
+    } catch (...) {
+    }
+    return parsed;
 }
 
 } // namespace NetworkMonitor

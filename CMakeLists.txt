@@ -8,6 +8,9 @@ project(network-monitor)
 find_package(Boost 1.85.0 REQUIRED COMPONENTS system)
 find_package(OpenSSL 3.2.1 REQUIRED COMPONENTS system)
 find_package(CURL 8.6.0 REQUIRED)
+find_package(CURL 8.6.0 REQUIRED)
+find_package(nlohmann_json 3.11.3 REQUIRED)
+
 set(LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
 )
@@ -38,6 +41,8 @@ target_include_directories(file-downloader
 target_link_libraries(file-downloader
     PRIVATE
         CURL::libcurl
+    PUBLIC
+        nlohmann_json::nlohmann_json
 )
 
 enable_testing()
@@ -64,6 +69,7 @@ target_link_libraries(network-monitor-tests
 target_compile_definitions(network-monitor-tests
     PRIVATE
         TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
+        TESTS_NETWORK_LAYOUT_JSON="${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json"
 )
 
 add_test(NAME websocket-client-test COMMAND ./network-monitor-tests)
