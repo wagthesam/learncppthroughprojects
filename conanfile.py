@@ -13,7 +13,8 @@ class ConanPackage(ConanFile):
         ('boost/1.85.0'),
         ('openssl/3.2.1'),
         ('libcurl/8.6.0'),
-        ('nlohmann_json/3.11.3')
+        ('nlohmann_json/3.11.3'),
+        ('abseil/20240116.2')
     ]
 
     default_options = {

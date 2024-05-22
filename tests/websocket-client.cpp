@@ -1,21 +1,25 @@
+#include <boost/test/unit_test_suite.hpp>
+#include <boost/test/tools/old/interface.hpp>
+#include <boost/asio/io_context.hpp>
+#include <boost/test/tools/interface.hpp>
 #include <network-monitor/websocket-client.h>
 
 #include <boost/asio.hpp>
-#include <boost/asio/ssl/context.hpp>
 #include <boost/test/unit_test.hpp>
 
-#include <iostream>
-#include <string>
 #include <filesystem>
+#include <sstream>
+
+#include "absl/strings/match.h"
 
 namespace {
-    bool CheckResponse(const std::string& response)
+    auto CheckResponse(const std::string& response) -> bool
     {
         // We do not parse the whole message. We only check that it contains some
         // expected items.
         bool ok {true};
-        ok &= response.find("ERROR") != std::string::npos;
-        ok &= response.find("ValidationInvalidAuth") != std::string::npos;
+        ok &= absl::StrContains(response, "ERROR");
+        ok &= absl::StrContains(response, "ValidationInvalidAuth");
         return ok;
     }
 }
@@ -99,12 +103,12 @@ BOOST_AUTO_TEST_CASE(class_Stomp_Msg)
     const std::string username {"fake_username"};
     const std::string password {"fake_password"};
     std::stringstream ss {};
-    ss << "STOMP" << std::endl
-       << "accept-version:1.2" << std::endl
-       << "host:transportforlondon.com" << std::endl
-       << "login:" << username << std::endl
-       << "passcode:" << password << std::endl
-       << std::endl // Headers need to be followed by a blank line.
+    ss << "STOMP" << '\n'
+       << "accept-version:1.2" << '\n'
+       << "host:transportforlondon.com" << '\n'
+       << "login:" << username << '\n'
+       << "passcode:" << password << '\n'
+       << '\n' // Headers need to be followed by a blank line.
        << '\0'; // The body (even if absent) must be followed by a NULL octet.
     const std::string message {ss.str()};
     std::string response;
