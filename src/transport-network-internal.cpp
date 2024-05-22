@@ -35,13 +35,14 @@ namespace NetworkMonitor {
         return routes;
     }
 
-    bool StationNode::AddEdge(std::shared_ptr<RouteEdge> edge, const Id& endStationId) {
-        auto edgePt = GetEdge(endStationId);
-        if (edgePt != nullptr) {
-            return false;
+    std::shared_ptr<RouteEdge> StationNode::GetOrMakeEdge(const Id& endStationId) {
+        auto stationIdEdgeIt = toStationIdToEdge_.find(endStationId);
+        if (stationIdEdgeIt != toStationIdToEdge_.end()) {
+            return stationIdEdgeIt->second;
         }
+        auto edge = std::make_shared<RouteEdge>();
         toStationIdToEdge_[endStationId] = edge;
-        return true;
+        return edge;
     }
 
     bool StationNode::AddIncomingEdge(const Id& fromStationId, std::shared_ptr<RouteEdge> edge) {
@@ -51,14 +52,6 @@ namespace NetworkMonitor {
         }
         fromStationIdToEdge_[fromStationId] = edge;
         return true;
-    }
-
-    std::shared_ptr<RouteEdge> StationNode::GetEdgeSharedPtr(const Id& stationId) {
-        auto stationIdEdgeIt = toStationIdToEdge_.find(stationId);
-        if (stationIdEdgeIt == toStationIdToEdge_.end()) {
-            return nullptr;
-        }
-        return stationIdEdgeIt->second;
     }
 
     RouteEdge* StationNode::GetEdge(const Id& stationId) {

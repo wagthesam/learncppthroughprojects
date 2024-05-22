@@ -21,11 +21,9 @@ namespace NetworkMonitor {
     };
 
     struct StationNode {
-        bool AddEdge(std::shared_ptr<RouteEdge> edge, const Id& endStationId);
+        std::shared_ptr<RouteEdge> GetOrMakeEdge(const Id& endStationId);
 
         bool AddIncomingEdge(const Id& fromStationId, std::shared_ptr<RouteEdge> edge);
-
-        std::shared_ptr<RouteEdge> GetEdgeSharedPtr(const Id& stationId);
 
         RouteEdge* GetEdge(const Id& stationId);
 

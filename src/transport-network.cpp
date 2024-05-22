@@ -74,12 +74,7 @@ bool TransportNetwork::AddLine(const Line& line) {
             if (nodePt == nullptr) {
                 return false;
             }
-            auto edge = nodePt->GetEdgeSharedPtr(curStationId);
-            if (edge == nullptr) {
-                edge = std::make_shared<RouteEdge>();
-                nodePt->AddEdge(edge, curStationId);
-            }
-
+            auto edge = nodePt->GetOrMakeEdge(curStationId);
             bool success = edge->AddRoute(
                 route.id,
                 route.lineId
