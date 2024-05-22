@@ -85,18 +85,17 @@ bool TransportNetwork::AddLine(const Line& line) {
                 route.id,
                 route.lineId
             );
+            if (!success) {
+                Log("Unable to add route:" + route.id, "AddLine");
+                return false;
+            }
 
             auto curNodePt = GetStationNode(curStationId);
             if (nodePt == nullptr) {
                 Log("Add line failed, station not on network:" + curStationId, "AddLine");
                 return false;
             }
-
-            success |= curNodePt->AddIncomingRoute(prevStationId, edge);
-            if (!success) {
-                Log("Unable to add route:" + route.id, "AddLine");
-                return false;
-            }
+            curNodePt->AddIncomingRoute(prevStationId, edge);
         }
     }
     return true;
@@ -161,20 +160,29 @@ bool TransportNetwork::SetTravelTime(
     return success;
 }
 
-unsigned int TransportNetwork::GetTravelTime(
+unsigned int TransportNetwork::GetTravelTimeDirectional(
         const Id& stationA,
         const Id& stationB) const {
+    if (stationA == stationB) {
+        return 0;
+    }
     auto nodePt = GetStationNode(stationA);
     if (nodePt == nullptr) {
-        Log("Could not find station Id: " + stationA, "GetTravelTime");
-        return false;
+        return 0;
     }
     auto edgePt = nodePt->GetEdge(stationB);
     if (edgePt == nullptr) {
-        Log("Could not find dest station Id: " + stationB, "GetTravelTime");
-        return false;
+        return 0;
     }
     return edgePt->GetTravelTime();
+}
+
+unsigned int TransportNetwork::GetTravelTime(
+        const Id& stationA,
+        const Id& stationB) const {
+    return std::max(
+        GetTravelTimeDirectional(stationA, stationB),
+        GetTravelTimeDirectional(stationB, stationA));
 }
     
 unsigned int TransportNetwork::GetTravelTime(
@@ -188,15 +196,14 @@ unsigned int TransportNetwork::GetTravelTime(
         auto stationPt = GetStationNode(cur_station);
         if (stationPt == nullptr) {
             Log("Could not find station Id: " + cur_station, "GetTravelTime");
-            return false;
+            return 0;
         }
         auto maybeStationTimePair = stationPt->GetNextStationAndTime(line, route);
         if (!maybeStationTimePair.has_value()) {
-            Log("Could not find next station using route", "GetTravelTime");
-            return false;
+            return 0;
         }
+        cur_station = maybeStationTimePair.value().first;
         time += maybeStationTimePair.value().second;
-        cur_station += maybeStationTimePair.value().first;
     }
     return time;
 }

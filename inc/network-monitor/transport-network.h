@@ -354,7 +354,7 @@ public:
 
             bool AddIncomingRoute(const Id& fromStationId, std::shared_ptr<RouteEdge> edge) {
                 auto stationIdEdgeIt = fromStationIdToEdge_.find(fromStationId);
-                if (stationIdEdgeIt != fromStationIdToEdge_.end() && &stationIdEdgeIt->second != &edge) {
+                if (stationIdEdgeIt != fromStationIdToEdge_.end() && stationIdEdgeIt->second != edge) {
                     Log("Conflicting edges", "AddIncomingRoute");
                     return false;
                 }
@@ -436,10 +436,14 @@ public:
             return &stationResult->second;
         }
 
-
         const StationNode* GetStationNode(const Id& stationId) const {
             return const_cast<TransportNetwork*>(this)->GetStationNode(stationId);
         }
+
+        unsigned int GetTravelTimeDirectional(
+            const Id& stationA,
+            const Id& stationB
+        ) const;
 
         std::unordered_map<Id, StationNode> stationIdToNode_;
 };
