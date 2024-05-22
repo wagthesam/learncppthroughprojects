@@ -1,5 +1,7 @@
 #pragma once
 
+#include "network-monitor/transport-network-defs.h"
+
 #include <nlohmann/json.hpp>
 
 #include <string>
@@ -16,9 +18,7 @@ namespace {
 
 namespace NetworkMonitor {
 
-/*! \brief A station, line, or route ID.
- */
-using Id = std::string;
+struct StationNode;
 
 /*! \brief Network station
  *
@@ -270,182 +270,21 @@ public:
         nlohmann::json&& srcs
     );
     private:
-        class RouteEdge {
-        public:
-            RouteEdge() : travelTime_(0) {}
+        StationNode* GetStationNode(const Id& stationId);
 
-            bool AddRoute(const Id& routeId, const Id& lineId) {
-                if (HasRoute(lineId, routeId)) {
-                    Log("Route exists: " + routeId, "AddRoute");
-                    return false;
-                }
-                auto routeIdsIt = lineToRouteIds_.find(lineId);
-                if (routeIdsIt == lineToRouteIds_.end()) {
-                    lineToRouteIds_[lineId] = {routeId};
-                    return true;
-                }
-                routeIdsIt->second.emplace_back(routeId);
-                return true;
-            }
-
-            bool HasRoute(const Id& lineId, const Id& routeId) const {
-                auto routes = GetRoutes(lineId);
-                return std::find(routes.begin(), routes.end(), routeId) != routes.end();
-            }
-
-            std::vector<Id> GetRoutes(const Id& lineId) const {
-                std::vector<Id> routes;
-                const auto& routeIdsIt = lineToRouteIds_.find(lineId);
-                if (routeIdsIt == lineToRouteIds_.end()) {
-                    return routes;
-                }
-                return routeIdsIt->second;
-            }
-
-            std::vector<Id> GetRoutes() const {
-                std::vector<Id> routes;
-                for (const auto& lineAndRouteId : lineToRouteIds_) {
-                    for (const auto& route : lineAndRouteId.second) {
-                        routes.emplace_back(route);
-                    }
-                }
-                return routes;
-            }
-
-            unsigned int GetTravelTime() const {
-                return travelTime_;
-            }
-
-            void SetTravelTime(unsigned int travelTime) {
-                travelTime_ = travelTime;
-            }
-        private:
-            unsigned int travelTime_;
-            std::unordered_map<Id, std::vector<Id>> lineToRouteIds_;
-        };
-
-        class StationNode {
-        public:
-            StationNode() = default;
-
-            bool AddEdge(std::shared_ptr<RouteEdge> edge, const Id& endStationId) {
-                auto edgePt = GetEdge(endStationId);
-                if (edgePt != nullptr) {
-                    Log("Failed to add edge to:" + endStationId, "AddEdge");
-                    return false;
-                }
-                toStationIdToEdge_[endStationId] = edge;
-                return true;
-            }
-
-            bool AddRoute(const Id& routeId, const Id& lineId, const Id& endStationId) {
-                auto edgePt = GetEdge(endStationId);
-                if (edgePt == nullptr) {
-                    toStationIdToEdge_[endStationId] = std::make_shared<RouteEdge>();
-                    edgePt = toStationIdToEdge_[endStationId].get();
-                }
-                bool success = edgePt->AddRoute(routeId, lineId);
-                if (!success) {
-                    Log("Failed to add route:" + routeId, "AddRoute");
-                    return false;
-                }
-                return true;
-            }
-
-            bool AddIncomingRoute(const Id& fromStationId, std::shared_ptr<RouteEdge> edge) {
-                auto stationIdEdgeIt = fromStationIdToEdge_.find(fromStationId);
-                if (stationIdEdgeIt != fromStationIdToEdge_.end() && stationIdEdgeIt->second != edge) {
-                    Log("Conflicting edges", "AddIncomingRoute");
-                    return false;
-                }
-                fromStationIdToEdge_[fromStationId] = edge;
-                return true;
-            }
-
-            std::shared_ptr<RouteEdge> GetEdgeSharedPtr(const Id& stationId) {
-                auto stationIdEdgeIt = toStationIdToEdge_.find(stationId);
-                if (stationIdEdgeIt == toStationIdToEdge_.end()) {
-                    Log("Could not find edge to station Id: " + stationId, "GetEdge");
-                    return nullptr;
-                }
-                return stationIdEdgeIt->second;
-            }
-
-            RouteEdge* GetEdge(const Id& stationId) {
-                auto stationIdEdgeIt = toStationIdToEdge_.find(stationId);
-                if (stationIdEdgeIt == toStationIdToEdge_.end()) {
-                    Log("Could not find edge to station Id: " + stationId, "GetEdge");
-                    return nullptr;
-                }
-                return stationIdEdgeIt->second.get();
-            }
-
-            const RouteEdge* GetEdge(const Id& stationId) const {
-                return const_cast<StationNode*>(this)->GetEdge(stationId);
-            }
-
-            std::vector<Id> GetRoutes() const {
-                std::unordered_set<Id> routes;
-                for (const auto& stationIdAndEdge : toStationIdToEdge_) {
-                    for (const auto& routeId : stationIdAndEdge.second->GetRoutes()) {
-                        routes.emplace(routeId);
-                    }
-                }
-                for (const auto& stationIdAndEdge : fromStationIdToEdge_) {
-                    for (const auto& routeId : stationIdAndEdge.second->GetRoutes()) {
-                        routes.emplace(routeId);
-                    }
-                }
-                return {routes.begin(), routes.end()};
-            }
-
-            void AddPassenger() {
-                passengers_++;
-            }
-
-            void RemovePassenger() {
-                passengers_--;
-            }
-
-            int GetPassengers() const {
-                return passengers_;
-            }
-
-            std::optional<std::pair<Id, unsigned int>> GetNextStationAndTime(
-                const Id& line,
-                const Id& route) const {
-                for (auto stationIdAndNode : toStationIdToEdge_) {
-                    if (stationIdAndNode.second->HasRoute(line, route)) {
-                        return std::pair<Id, unsigned int>(
-                            stationIdAndNode.first, 
-                            stationIdAndNode.second->GetTravelTime());
-                    }
-                }
-                return {};
-            }
-        private:
-            int passengers_;
-            std::unordered_map<Id, std::shared_ptr<RouteEdge>> toStationIdToEdge_;
-            std::unordered_map<Id, std::shared_ptr<RouteEdge>> fromStationIdToEdge_;
-        };
-        StationNode* GetStationNode(const Id& stationId) {
-            auto stationResult = stationIdToNode_.find(stationId);
-            if (stationResult == stationIdToNode_.end()) {
-                return nullptr;
-            }
-            return &stationResult->second;
-        }
-
-        const StationNode* GetStationNode(const Id& stationId) const {
-            return const_cast<TransportNetwork*>(this)->GetStationNode(stationId);
-        }
+        const StationNode* GetStationNode(const Id& stationId) const;
 
         unsigned int GetTravelTimeDirectional(
             const Id& stationA,
             const Id& stationB
         ) const;
 
-        std::unordered_map<Id, StationNode> stationIdToNode_;
+        bool SetTravelTimeDirectional(
+            const Id& stationA,
+            const Id& stationB,
+            const unsigned int travelTime);
+
+        std::unordered_map<Id, std::shared_ptr<StationNode>> stationIdToNode_;
 };
 
 } // namespace NetworkMonitor

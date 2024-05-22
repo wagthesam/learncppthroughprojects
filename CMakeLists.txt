@@ -14,6 +14,18 @@ find_package(absl 20240116.2 REQUIRED)
 
 set(INC "inc")
 
+set(TRANSPORT_INTERNAL_LIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/transport-network-internal.cpp"
+)
+add_library(transport-network-int STATIC ${TRANSPORT_INTERNAL_LIB_SOURCES})
+target_compile_features(transport-network-int
+    PRIVATE
+        cxx_std_17
+)
+target_include_directories(transport-network-int
+    PRIVATE
+    ${INC})
+
 set(TRANSPORT_LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/transport-network.cpp"
 )
@@ -30,6 +42,8 @@ target_link_libraries(transport-network
         ${Boost_LIBRARIES}
         openssl::openssl
         nlohmann_json::nlohmann_json
+    PRIVATE
+        transport-network-int
 )
 
 set(LIB_SOURCES

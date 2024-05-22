@@ -1,10 +1,11 @@
+#include "network-monitor/transport-network-defs.h"
 #include "network-monitor/transport-network.h"
+#include "network-monitor-internal/transport-network-internal.h"
 
 #include <nlohmann/json.hpp>
 
 #include <string>
 #include <vector>
-#include <iostream>
 
 namespace {
     template <class T>
@@ -57,10 +58,9 @@ bool Line::operator!=(const Line& other) const {
 bool TransportNetwork::AddStation(const Station& station) {
     auto nodePt = GetStationNode(station.id);
     if (nodePt != nullptr) {
-        Log("Station already exists in network: " + station.name + ", " + station.id, "AddStation");
         return false;
     }
-    stationIdToNode_[station.id] = StationNode();
+    stationIdToNode_[station.id] = std::make_shared<StationNode>();
     return true;
 }
 
@@ -72,7 +72,6 @@ bool TransportNetwork::AddLine(const Line& line) {
 
             auto nodePt = GetStationNode(prevStationId);
             if (nodePt == nullptr) {
-                Log("Add line failed, station not on network:" + prevStationId, "AddLine");
                 return false;
             }
             auto edge = nodePt->GetEdgeSharedPtr(curStationId);
@@ -86,16 +85,14 @@ bool TransportNetwork::AddLine(const Line& line) {
                 route.lineId
             );
             if (!success) {
-                Log("Unable to add route:" + route.id, "AddLine");
                 return false;
             }
 
             auto curNodePt = GetStationNode(curStationId);
             if (nodePt == nullptr) {
-                Log("Add line failed, station not on network:" + curStationId, "AddLine");
                 return false;
             }
-            curNodePt->AddIncomingRoute(prevStationId, edge);
+            curNodePt->AddIncomingEdge(prevStationId, edge);
         }
     }
     return true;
@@ -104,20 +101,18 @@ bool TransportNetwork::AddLine(const Line& line) {
 bool TransportNetwork::RecordPassengerEvent(const PassengerEvent& event) {
     auto nodePt = GetStationNode(event.stationId);
     if (nodePt == nullptr) {
-        Log("Could not find station Id: " + event.stationId, "RecordPassengerEvent");
         return false;
     }
-    event.type == PassengerEvent::Type::In ? nodePt->AddPassenger() : nodePt->RemovePassenger();
+    event.type == PassengerEvent::Type::In ? nodePt->passengers_++ : nodePt->passengers_--;
     return true;
 }
 
 long long int TransportNetwork::GetPassengerCount(const Id& station) const {
     auto nodePt = GetStationNode(station);
     if (nodePt == nullptr) {
-        Log("Could not find station Id: " + station, "GetPassengerCount");
-        throw std::runtime_error("Station not found");
+        throw std::runtime_error("Station not found: " + station);
     }
-    return nodePt->GetPassengers();
+    return nodePt->passengers_;
 }
 
 std::vector<Id> TransportNetwork::GetRoutesServingStation(const Id& station) const {
@@ -132,33 +127,28 @@ bool TransportNetwork::SetTravelTime(
     const Id& stationA,
     const Id& stationB,
     const unsigned int travelTime) {
+    bool success = SetTravelTimeDirectional(stationA, stationB, travelTime);
+    success |= SetTravelTimeDirectional(stationB, stationA, travelTime);
+    return success;
+}
+
+bool TransportNetwork::SetTravelTimeDirectional(
+    const Id& stationA,
+    const Id& stationB,
+    const unsigned int travelTime) {
     auto nodePt = GetStationNode(stationA);
     if (nodePt == nullptr) {
-        Log("Could not find station Id: " + stationA, "SetTravelTime");
         return false;
     }
     auto edgePt = nodePt->GetEdge(stationB);
     bool success = false;
     if (edgePt != nullptr) {
-        edgePt->SetTravelTime(travelTime);
+        edgePt->travelTime_ = travelTime;
         success = true;
-    }
-
-    auto nodeBPt = GetStationNode(stationB);
-    if (nodeBPt == nullptr) {
-        Log("Could not find station Id: " + stationB, "SetTravelTime");
-        return false;
-    }
-    auto reverseEdgePt = nodeBPt->GetEdge(stationA);
-    if (reverseEdgePt != nullptr) {
-        reverseEdgePt->SetTravelTime(travelTime);
-        success = true;
-    }
-    if (!success) {
-        Log("Unable to find an edge", "SetTravelTime");
     }
     return success;
 }
+
 
 unsigned int TransportNetwork::GetTravelTimeDirectional(
         const Id& stationA,
@@ -174,7 +164,7 @@ unsigned int TransportNetwork::GetTravelTimeDirectional(
     if (edgePt == nullptr) {
         return 0;
     }
-    return edgePt->GetTravelTime();
+    return edgePt->travelTime_;
 }
 
 unsigned int TransportNetwork::GetTravelTime(
@@ -195,17 +185,34 @@ unsigned int TransportNetwork::GetTravelTime(
     while (cur_station != stationB) {
         auto stationPt = GetStationNode(cur_station);
         if (stationPt == nullptr) {
-            Log("Could not find station Id: " + cur_station, "GetTravelTime");
             return 0;
         }
-        auto maybeStationTimePair = stationPt->GetNextStationAndTime(line, route);
-        if (!maybeStationTimePair.has_value()) {
+        bool foundNextEdge = false;
+        for (const auto& [toStationId, edge] : stationPt->toStationIdToEdge_) {
+            if (edge->HasRoute(line, route)) {
+                cur_station = toStationId;
+                time += edge->travelTime_;
+                foundNextEdge = true;
+                break;
+            }
+        }
+        if (!foundNextEdge) {
             return 0;
         }
-        cur_station = maybeStationTimePair.value().first;
-        time += maybeStationTimePair.value().second;
     }
     return time;
+}
+
+StationNode* TransportNetwork::GetStationNode(const Id& stationId) {
+    auto stationResult = stationIdToNode_.find(stationId);
+    if (stationResult == stationIdToNode_.end()) {
+        return nullptr;
+    }
+    return stationResult->second.get();
+}
+
+const StationNode* TransportNetwork::GetStationNode(const Id& stationId) const {
+    return const_cast<TransportNetwork*>(this)->GetStationNode(stationId);
 }
 
 bool TransportNetwork::FromJson(
