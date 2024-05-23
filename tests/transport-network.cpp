@@ -1,6 +1,7 @@
 #include <network-monitor/transport-network.h>
 
 #include <boost/test/unit_test.hpp>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <fstream>
@@ -528,6 +529,14 @@ BOOST_AUTO_TEST_CASE(over_route)
     BOOST_CHECK_EQUAL(
         nw.GetTravelTime(line.id, route0.id, station1.id, station1.id), 0
     );
+}
+
+BOOST_AUTO_TEST_CASE(json)
+{
+    std::ifstream f(TESTS_NETWORK_LAYOUT_JSON);
+    TransportNetwork network;
+    bool ok = network.FromJson(nlohmann::json::parse(f));
+    BOOST_CHECK(ok);
 }
 
 BOOST_AUTO_TEST_SUITE_END(); // TravelTime

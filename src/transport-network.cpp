@@ -212,7 +212,65 @@ const StationNode* TransportNetwork::GetStationNode(const Id& stationId) const {
 
 bool TransportNetwork::FromJson(
     nlohmann::json&& src) {
-    return true;
+    bool success;
+    for (auto it = src["stations"].begin(); it != src["stations"].end(); it++) {
+        auto stationId = (*it)["station_id"].template get<std::string>();
+        auto name = (*it)["name"].template get<std::string>();
+        success = AddStation(Station{stationId, name});
+        if (!success) {
+            throw std::runtime_error("Unable to add station: " + stationId);
+        }
+    }
+
+    std::unordered_map<std::string, std::string> lineIdToName;
+    std::unordered_map<std::string, std::vector<Route>> lineToRoutes;
+    for (auto it = src["lines"].begin(); it != src["lines"].end(); it++) {
+        auto lineId = (*it)["line_id"].template get<std::string>();
+        if (lineIdToName.find(lineId) == lineIdToName.end()) {
+            lineIdToName[lineId] = (*it)["name"].template get<std::string>();
+        }
+        for (auto routesIt = (*it)["routes"].begin(); routesIt != (*it)["routes"].end(); routesIt++) {
+            std::vector<Id> stops;
+            for (auto stopsIt = (*routesIt)["route_stops"].begin(); stopsIt != (*routesIt)["route_stops"].end(); stopsIt++) {
+                stops.emplace_back(*stopsIt);
+            }
+            auto route = Route{
+                (*routesIt)["route_id"].template get<std::string>(),
+                (*routesIt)["direction"].template get<std::string>(),
+                lineId,
+                (*routesIt)["start_station_id"].template get<std::string>(),
+                (*routesIt)["end_station_id"].template get<std::string>(),
+                stops
+            };
+            auto lineAndRouteIt = lineToRoutes.find(lineId);
+            if (lineAndRouteIt == lineToRoutes.end()) {
+                lineToRoutes[lineId] = {route};
+            } else {
+                lineToRoutes[lineId].push_back(route);
+            }
+        }
+    }
+
+    for (const auto& [lineId, route] : lineToRoutes) {
+        success = AddLine(Line{
+            lineId,
+            lineIdToName[lineId],
+            lineToRoutes[lineId]
+        });
+        if (!success) {
+            throw std::runtime_error("Unable to add line: " + lineId);
+        }
+    }
+
+    success = true;
+    for (auto it = src["travel_times"].begin(); it != src["travel_times"].end(); it++) {
+        success |= SetTravelTime(
+            (*it)["start_station_id"].template get<std::string>(),
+            (*it)["end_station_id"].template get<std::string>(),
+            (*it)["travel_time"]);
+    }
+
+    return success;
 }
 
 } // namespace NetworkMonitor
