@@ -46,24 +46,6 @@ target_link_libraries(transport-network
         transport-network-int
 )
 
-set(LIB_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/websocket-client.cpp"
-)
-add_library(network-monitor STATIC ${LIB_SOURCES})
-target_compile_features(network-monitor
-    PRIVATE
-        cxx_std_17
-)
-set(INC "inc")
-target_include_directories(network-monitor
-    PUBLIC
-    ${INC})
-target_link_libraries(network-monitor
-    PUBLIC
-        ${Boost_LIBRARIES}
-        openssl::openssl
-)
-
 add_library(file-downloader STATIC "${CMAKE_CURRENT_SOURCE_DIR}/src/file-downloader.cpp")
 target_compile_features(file-downloader
     PRIVATE
@@ -87,6 +69,7 @@ set(TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/transport-network.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp")
 
+set(TEST_INC "tests")
 add_executable(network-monitor-tests ${TEST_SOURCES})
 target_compile_features(network-monitor-tests
     PRIVATE
@@ -94,12 +77,12 @@ target_compile_features(network-monitor-tests
 )
 target_include_directories(network-monitor-tests
     PRIVATE
-    ${NETWORK_MONITOR_INC})
+    ${INC}
+    ${TEST_INC})
 target_link_libraries(network-monitor-tests
     PRIVATE
         ${Boost_LIBRARIES}
         abseil::abseil
-        network-monitor
         file-downloader
         transport-network
 )

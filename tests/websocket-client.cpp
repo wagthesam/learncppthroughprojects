@@ -1,9 +1,10 @@
+#include "boost-mock.h"
+#include "network-monitor/websocket-client.h"
+
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/tools/old/interface.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/test/tools/interface.hpp>
-#include <network-monitor/websocket-client.h>
-
 #include <boost/asio.hpp>
 #include <boost/test/unit_test.hpp>
 
@@ -24,9 +25,23 @@ namespace {
     }
 }
 
-using NetworkMonitor::WebSocketClient;
+using NetworkMonitor::BoostWebSocketClient;
+using NetworkMonitor::MockResolver;
+using NetworkMonitor::TestWebSocketClient;
+
+struct WebSocketClientTestFixture {
+    WebSocketClientTestFixture()
+    {
+        NetworkMonitor::MockResolver::resolveEc = {};
+        NetworkMonitor::MockTcpStream::connectEc = {};
+    }
+};
+
+using timeout = boost::unit_test::timeout;
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
+
+BOOST_AUTO_TEST_SUITE(class_WebSocketClient_non_mock);
 
 BOOST_AUTO_TEST_CASE(class_WebSocketClient)
 {
@@ -44,7 +59,7 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
     ctx.load_verify_file(TESTS_CACERT_PEM);
 
     // The class under test
-    WebSocketClient client {url, endpoint, port, ioc, ctx};
+    BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.
@@ -89,6 +104,12 @@ BOOST_AUTO_TEST_CASE(class_WebSocketClient)
         messageMatches &&
         disconnected
     };
+
+    BOOST_TEST(connected);
+    BOOST_TEST(messageSent);
+    BOOST_TEST(messageReceived);
+    BOOST_TEST(messageMatches);
+    BOOST_TEST(disconnected);
     BOOST_TEST(ok);
 }
 
@@ -120,7 +141,7 @@ BOOST_AUTO_TEST_CASE(class_Stomp_Msg)
     ctx.load_verify_file(TESTS_CACERT_PEM);
 
     // The class under test
-    WebSocketClient client {url, endpoint, port, ioc, ctx};
+    BoostWebSocketClient client {url, endpoint, port, ioc, ctx};
 
     // We use these flags to check that the connection, send, receive functions
     // work as expected.
@@ -162,3 +183,67 @@ BOOST_AUTO_TEST_CASE(class_Stomp_Msg)
     BOOST_CHECK(CheckResponse(response));
 }
 BOOST_AUTO_TEST_SUITE_END();
+
+BOOST_AUTO_TEST_SUITE(class_WebSocketClient_mock);
+
+BOOST_FIXTURE_TEST_SUITE(Connect, WebSocketClientTestFixture);
+
+BOOST_AUTO_TEST_CASE(fail_resolve, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    // Set the expected error codes.
+    MockResolver::resolveEc = boost::asio::error::host_not_found;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnConnect {false};
+    auto onConnect {[&calledOnConnect](auto ec) {
+        calledOnConnect = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::host_not_found);
+    }};
+    client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnConnect);
+}
+
+BOOST_AUTO_TEST_CASE(fail_socket_connect, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    // Set the expected error codes.
+    NetworkMonitor::MockTcpStream::connectEc = boost::asio::error::connection_refused;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnConnect {false};
+    auto onConnect {[&calledOnConnect](auto ec) {
+        calledOnConnect = true;
+        BOOST_CHECK_EQUAL(ec, boost::asio::error::connection_refused);
+    }};
+    client.Connect(onConnect);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnConnect);
+}
+
+BOOST_AUTO_TEST_SUITE_END(); // Connect
+
+BOOST_AUTO_TEST_SUITE_END(); // class_WebSocketClient
+
+BOOST_AUTO_TEST_SUITE_END(); // network_monitor
