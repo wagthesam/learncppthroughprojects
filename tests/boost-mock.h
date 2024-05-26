@@ -71,6 +71,7 @@ class MockWebsocketStream : public boost::beast::websocket::stream<NextLayer> {
 public:
     using boost::beast::websocket::stream<NextLayer>::stream;
     inline static boost::system::error_code handshakeEc = {};
+    inline static boost::system::error_code writeEc = {};
 
     template<typename HandshakeHandler>
     void async_handshake(
@@ -88,6 +89,39 @@ public:
                         handler(MockWebsocketStream::handshakeEc);
                     }
                 );
+            },
+            handler,
+            this->get_executor()
+        );
+    }
+
+    template <typename Buffer, typename WriteHandler>
+    void async_write(
+        const Buffer & buffer,
+        WriteHandler&& handler
+        ) {
+        boost::asio::async_initiate<
+                WriteHandler,
+                void(
+                    boost::system::error_code,
+                    std::size_t)>(
+            [buffer = std::move(buffer)](auto&& handler, auto&& ex) {
+                if (MockWebsocketStream::writeEc) {
+                    boost::asio::post(
+                        ex, 
+                        [handler = std::move(handler)]() {
+                            handler(MockWebsocketStream::writeEc, 0);
+                        }
+                    );
+                } else {
+                    auto bufferSize = buffer.size();
+                    boost::asio::post(
+                        ex, 
+                        [bufferSize, handler = std::move(handler)]() {
+                            handler(MockWebsocketStream::writeEc, bufferSize);
+                        }
+                    );
+                }
             },
             handler,
             this->get_executor()
@@ -176,33 +210,3 @@ using MockWsStream = MockWebsocketStream<MockTlsStream>;
 using TestWebSocketClient = NetworkMonitor::WebSocketClient<MockResolver, MockWsStream>;
 
 }
-
-/*
-
-    template <typename ConstBufferSequence>
-    void async_write(
-        const ConstBufferSequence & buffers,
-        ) {
-        boost::asio::async_initiate<
-                ResolveHandler,
-                void(
-                    boost::system::error_code,
-                    std::size_t)>(
-            [](auto&& handler, auto&& context) {
-                if (MockResolver::resolveEc) {
-                    std::size_t result_size = 0;
-                    boost::asio::post(
-                        context, 
-                        [result_size, handler = std::move(handler)]() {
-                            handler(MockResolver::resolveEc, result_size);
-                        }
-                    );
-                } else {
-                    // pass for now
-                }
-            },
-            handler,
-            context_
-        );
-    }
-*/
