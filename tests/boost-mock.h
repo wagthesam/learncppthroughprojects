@@ -3,6 +3,8 @@
 #include "network-monitor/websocket-client.h"
 
 #include <boost/asio.hpp>
+#include <boost/beast.hpp>
+#include <boost/beast/ssl/ssl_stream.hpp>
 
 #include <string>
 #include <iostream>
@@ -35,6 +37,72 @@ public:
         );
     }
 };
+
+template <typename NextLayer>
+class MockSslStream : public boost::beast::ssl_stream<NextLayer> {
+public:
+    using boost::beast::ssl_stream<NextLayer>::ssl_stream;
+    inline static boost::system::error_code handshakeEc = {};
+
+    template<typename HandshakeHandler>
+    void async_handshake(
+        boost::asio::ssl::stream_base::handshake_type type,
+        HandshakeHandler handler
+    ) {
+        boost::asio::async_initiate<
+                HandshakeHandler,
+                void(boost::system::error_code)>(
+            [](auto&& handler, auto&& ex) {
+                boost::asio::post(
+                    ex,
+                    [handler = std::move(handler)]() {
+                        handler(MockSslStream::handshakeEc);
+                    }
+                );
+            },
+            handler,
+            this->get_executor()
+        );
+    }
+};
+
+template <typename NextLayer>
+class MockWebsocketStream : public boost::beast::websocket::stream<NextLayer> {
+public:
+    using boost::beast::websocket::stream<NextLayer>::stream;
+    inline static boost::system::error_code handshakeEc = {};
+
+    template<typename HandshakeHandler>
+    void async_handshake(
+        std::string_view host,
+        std::string_view target,
+        HandshakeHandler&& handler) 
+    {
+        boost::asio::async_initiate<
+                HandshakeHandler,
+                void(boost::system::error_code)>(
+            [](auto&& handler, auto&& ex) {
+                boost::asio::post(
+                    ex,
+                    [handler = std::move(handler)]() {
+                        handler(MockWebsocketStream::handshakeEc);
+                    }
+                );
+            },
+            handler,
+            this->get_executor()
+        );
+    }
+};
+
+template <typename TeardownHandler>
+void async_teardown(
+    boost::beast::role_type role,
+    MockSslStream<MockTcpStream>& socket,
+    TeardownHandler&& handler
+) {
+    return;
+}
 
 template <typename TeardownHandler>
 void async_teardown(
@@ -98,18 +166,16 @@ private:
     boost::asio::strand<boost::asio::io_context::executor_type> context_;
 };
 
+
 /*! \brief Type alias for the mocked WebSocketClient.
  *
  *  For now we only mock the DNS resolver.
  */
-using TestWebSocketClient = NetworkMonitor::WebSocketClient<
-    MockResolver,
-    boost::beast::websocket::stream<
-        boost::beast::ssl_stream<MockTcpStream>
-    >
->;
-}
+using MockTlsStream = MockSslStream<MockTcpStream>;
+using MockWsStream = MockWebsocketStream<MockTlsStream>;
+using TestWebSocketClient = NetworkMonitor::WebSocketClient<MockResolver, MockWsStream>;
 
+}
 
 /*
 

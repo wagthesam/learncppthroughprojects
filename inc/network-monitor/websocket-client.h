@@ -35,9 +35,9 @@ public:
      *                  ioc.run().
      */
     WebSocketClient(
-        const std::string& url,
-        const std::string& endpoint,
-        const std::string& port,
+        std::string_view url,
+        std::string_view endpoint,
+        std::string_view port,
         boost::asio::io_context& ioc,
         boost::asio::ssl::context& ctx
     ) : url_(url),
@@ -94,7 +94,7 @@ public:
      *                 failed to send.
      */
     void Send(
-        const std::string& message,
+        std::string_view message,
         std::function<void (boost::system::error_code)> onSend = nullptr
     ) {
         ws_.async_write(boost::asio::buffer(message), [this, onSend](auto ec, auto bytes_transferred){
@@ -125,14 +125,14 @@ public:
     }
 
 private:
-    void Log(const std::string& ref, const boost::system::error_code& ec) {
+    void Log(std::string_view ref, const boost::system::error_code& ec) {
         std::cout << ref << " > "
                 << (ec ? "Error: " : "OK!")
                 << (ec ? ec.message() : "")
                 << std::endl;
     }
 
-    void Log(const std::string& msg) {
+    void Log(std::string_view msg) {
         std::cout << msg << std::endl;
     }
 
