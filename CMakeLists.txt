@@ -14,6 +14,22 @@ find_package(absl 20240116.2 REQUIRED)
 
 set(INC "inc")
 
+set(STOMP_LIB_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/stomp-frame.cpp"
+)
+add_library(stomp STATIC ${STOMP_LIB_SOURCES})
+target_compile_features(stomp
+    PRIVATE
+        cxx_std_17
+)
+target_include_directories(stomp
+    PUBLIC
+    ${INC})
+target_link_libraries(stomp
+    PUBLIC
+        ${Boost_LIBRARIES}
+)
+
 set(TRANSPORT_INTERNAL_LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/transport-network-internal.cpp"
 )
@@ -66,6 +82,7 @@ enable_testing()
 set(TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/stomp-frame.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/transport-network.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp")
 
@@ -85,6 +102,7 @@ target_link_libraries(network-monitor-tests
         abseil::abseil
         file-downloader
         transport-network
+        stomp
 )
 target_compile_definitions(network-monitor-tests
     PRIVATE

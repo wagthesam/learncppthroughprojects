@@ -72,6 +72,9 @@ public:
     using boost::beast::websocket::stream<NextLayer>::stream;
     inline static boost::system::error_code handshakeEc = {};
     inline static boost::system::error_code writeEc = {};
+    inline static boost::system::error_code readEc = {};
+    inline static boost::system::error_code closeEc = {};
+    inline static std::string readBuffer = {};
 
     template<typename HandshakeHandler>
     void async_handshake(
@@ -82,16 +85,17 @@ public:
         boost::asio::async_initiate<
                 HandshakeHandler,
                 void(boost::system::error_code)>(
-            [](auto&& handler, auto&& ex) {
+            [](auto&& handler, auto stream) {
                 boost::asio::post(
-                    ex,
-                    [handler = std::move(handler)]() {
+                    stream->get_executor(),
+                    [handler = std::move(handler), stream]() {
+                        stream->closed_ = false;
                         handler(MockWebsocketStream::handshakeEc);
                     }
                 );
             },
             handler,
-            this->get_executor()
+            this
         );
     }
 
@@ -127,6 +131,88 @@ public:
             this->get_executor()
         );
     }
+
+    template <typename DynamicBuffer, typename ReadHandler>
+    void async_read(
+        DynamicBuffer& buffer,
+        ReadHandler&& handler
+        ) {
+        boost::asio::async_initiate<
+                ReadHandler,
+                void(
+                    boost::system::error_code,
+                    std::size_t)>(
+            [this](auto&& handler, auto& buffer) {
+                RecursiveRead(buffer, std::forward<ReadHandler>(handler));
+            },
+            handler,
+            buffer
+        );
+    }
+
+    template <typename CloseHandler>
+    void async_close(
+            boost::beast::websocket::close_reason const& cr,
+            CloseHandler&& handler
+        ) {
+        boost::asio::async_initiate<
+                CloseHandler,
+                void(boost::system::error_code)>(
+            [](auto&& handler, auto stream) {
+                boost::asio::post(
+                    stream->get_executor(),
+                    [handler = std::move(handler), stream]() {
+                        stream->closed_ = true;
+                        handler(MockWebsocketStream::closeEc);
+                    }
+                );
+            },
+            handler,
+            this
+        );
+    }
+
+private:
+    template <typename DynamicBuffer, typename ReadHandler>
+    void RecursiveRead(
+        DynamicBuffer& buffer,
+        ReadHandler&& handler
+    ) {
+        if (closed_) {
+            boost::asio::post(
+                this->get_executor(),
+                [handler = std::move(handler)]() {
+                    handler(boost::asio::error::operation_aborted, 0);
+                }
+            );
+        } else {
+            size_t readSize = MockWebsocketStream::readBuffer.size();
+            readSize = boost::asio::buffer_copy(
+                buffer.prepare(MockWebsocketStream::readBuffer.size()),
+                boost::asio::buffer(MockWebsocketStream::readBuffer)
+            );
+            buffer.commit(readSize);
+            MockWebsocketStream::readBuffer = "";
+
+            if (readSize > 0) {
+                boost::asio::post(
+                    this->get_executor(),
+                    [readSize, handler = std::move(handler)]() {
+                        handler(MockWebsocketStream::readEc, readSize);
+                    }
+                );
+            } else {
+                boost::asio::post(
+                    this->get_executor(),
+                    [this, &buffer, handler = std::move(handler)]() {
+                        RecursiveRead(buffer, handler);
+                    }
+                );
+            }
+        }
+    }
+
+    bool closed_ {true};
 };
 
 template <typename TeardownHandler>
@@ -208,5 +294,4 @@ private:
 using MockTlsStream = MockSslStream<MockTcpStream>;
 using MockWsStream = MockWebsocketStream<MockTlsStream>;
 using TestWebSocketClient = NetworkMonitor::WebSocketClient<MockResolver, MockWsStream>;
-
 }

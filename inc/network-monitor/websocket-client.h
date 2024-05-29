@@ -81,8 +81,8 @@ public:
         resolver_.async_resolve(
             url_,
             port_,
-            [this](auto&& ec, auto&& results) {
-                OnResolve(std::forward<decltype(ec)>(ec), std::forward<decltype(results)>(results));
+            [this](auto ec, auto&& results) {
+                OnResolve(ec, std::forward<decltype(results)>(results));
             });
     }
 
@@ -116,11 +116,9 @@ public:
     ) {
         closed_ = true;
         ws_.async_close(boost::beast::websocket::close_code::none, [this, onClose](auto ec){
-            if (ec) {
-                Log("Close", ec);
-                return;
+            if (onClose != nullptr) {
+                onClose(ec);
             }
-            onClose(ec);
         });
     }
 
@@ -168,8 +166,8 @@ private:
         ));
         ws_.next_layer().async_handshake(
             boost::asio::ssl::stream_base::client,
-            [this](auto&& ec) {
-                OnTlsHandshake(std::forward<decltype(ec)>(ec));
+            [this](auto ec) {
+                OnTlsHandshake(ec);
             });
     }
 
@@ -198,10 +196,8 @@ private:
 
         ws_.async_read(
             buffer_,
-            [this](auto&& ec, auto&& bytes_transferred) {
-                OnRead(
-                    std::forward<decltype(ec)>(ec),
-                    std::forward<decltype(bytes_transferred)>(bytes_transferred));
+            [this](auto ec, auto bytes_transferred) {
+                OnRead(ec, bytes_transferred);
                 ListenToIncomingMessage(ec);
             }
         );
@@ -218,8 +214,8 @@ private:
         ws_.async_handshake(
             url_,
             endpoint_,
-            [this](auto&& ec) {
-                OnHandshake(std::forward<decltype(ec)>(ec));
+            [this](auto ec) {
+                OnHandshake(ec);
             }
         );
     }
@@ -230,7 +226,9 @@ private:
             Log("OnRead", ec);
             return;
         }
-        onMessage_(ec, boost::beast::buffers_to_string(buffer_.data()));
+        if (onMessage_) {
+            onMessage_(ec, boost::beast::buffers_to_string(buffer_.data()));
+        }
         buffer_.clear();
     }
 

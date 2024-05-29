@@ -36,6 +36,8 @@ struct WebSocketClientTestFixture {
         NetworkMonitor::MockTcpStream::connectEc = {};
         NetworkMonitor::MockTlsStream::handshakeEc = {};
         NetworkMonitor::MockWsStream::handshakeEc = {};
+        NetworkMonitor::MockWsStream::writeEc = {};
+        NetworkMonitor::MockWsStream::readEc = {};
     }
 };
 
@@ -287,9 +289,10 @@ BOOST_AUTO_TEST_CASE(fail_websocket_handshake, *timeout {1})
 
     TestWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnConnect {false};
-    auto onConnect {[&calledOnConnect](auto ec) {
+    auto onConnect {[&calledOnConnect, &client](auto ec) {
         calledOnConnect = true;
         BOOST_CHECK_EQUAL(ec, boost::asio::error::timed_out);
+        client.Close();
     }};
     client.Connect(onConnect);
     ioc.run();
@@ -311,9 +314,10 @@ BOOST_AUTO_TEST_CASE(success_websocket_connection, *timeout {1})
 
     TestWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnConnect {false};
-    auto onConnect {[&calledOnConnect](auto ec) {
+    auto onConnect {[&calledOnConnect, &client](auto ec) {
         calledOnConnect = true;
         BOOST_CHECK_EQUAL(ec, boost::system::error_code());
+        client.Close();
     }};
     client.Connect(onConnect);
     ioc.run();
@@ -335,9 +339,10 @@ BOOST_AUTO_TEST_CASE(success_ws_write, *timeout {1})
 
     TestWebSocketClient client {url, endpoint, port, ioc, ctx};
     bool calledOnSend {false};
-    auto OnSend {[&calledOnSend](auto ec) {
+    auto OnSend {[&calledOnSend, &client](auto ec) {
         calledOnSend = true;
         BOOST_CHECK_EQUAL(ec, boost::system::error_code());
+        client.Close();
     }};
     client.Send("Hello", OnSend);
     ioc.run();
@@ -370,6 +375,125 @@ BOOST_AUTO_TEST_CASE(fail_ws_write, *timeout {1})
 
     // When we get here, the io_context::run function has run out of work to do.
     BOOST_CHECK(!calledOnSend);
+}
+
+BOOST_AUTO_TEST_CASE(fail_ws_read, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    // Set the expected error codes.
+    NetworkMonitor::MockWsStream::readEc = boost::asio::error::timed_out;
+    NetworkMonitor::MockWsStream::readBuffer = "msg";
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    auto onRead {[](auto ec, auto msg) {
+        BOOST_CHECK(false);
+    }};
+    client.Connect(nullptr, onRead);
+
+    boost::asio::high_resolution_timer timer(ioc);
+    timer.expires_after(std::chrono::milliseconds(250));
+    timer.async_wait([&client](auto ec) {
+        // This test assumes that Close() works.
+        client.Close();
+    });
+    ioc.run();
+}
+
+BOOST_AUTO_TEST_CASE(success_ws_read, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    NetworkMonitor::MockWsStream::readBuffer = "msg";
+    auto refMsg = NetworkMonitor::MockWsStream::readBuffer;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    bool calledOnRead {false};
+    auto onRead {[&calledOnRead, &refMsg, &client](auto ec, auto msg) {
+        BOOST_CHECK_EQUAL(ec, boost::system::error_code());
+        BOOST_CHECK_EQUAL(refMsg, msg);
+        calledOnRead = true;
+        client.Close();
+    }};
+    client.Connect(nullptr, onRead);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK(calledOnRead);
+}
+
+BOOST_AUTO_TEST_CASE(success_ws_read_twice, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    NetworkMonitor::MockWsStream::readBuffer = "msg";
+    auto refMsg = NetworkMonitor::MockWsStream::readBuffer;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    int calledOnRead = 0;
+    auto onRead {[&calledOnRead, &refMsg, &client](auto ec, auto msg) {
+        calledOnRead++;
+        BOOST_CHECK_EQUAL(ec, boost::system::error_code());
+        BOOST_CHECK_EQUAL(refMsg, msg);
+        if (calledOnRead >= 2) {
+            client.Close();
+        } else {
+            NetworkMonitor::MockWsStream::readBuffer = refMsg;
+        }
+    }};
+    client.Connect(nullptr, onRead);
+    ioc.run();
+
+    // When we get here, the io_context::run function has run out of work to do.
+    BOOST_CHECK_EQUAL(calledOnRead, 2);
+}
+
+BOOST_AUTO_TEST_CASE(success_ws_read_no_handler, *timeout {1})
+{
+    // We use the mock client so we don't really connect to the target.
+    const std::string url {"some.echo-server.com"};
+    const std::string endpoint {"/"};
+    const std::string port {"443"};
+
+    boost::asio::ssl::context ctx {boost::asio::ssl::context::tlsv12_client};
+    ctx.load_verify_file(TESTS_CACERT_PEM);
+    boost::asio::io_context ioc {};
+
+    NetworkMonitor::MockWsStream::readBuffer = "msg";
+    auto refMsg = NetworkMonitor::MockWsStream::readBuffer;
+
+    TestWebSocketClient client {url, endpoint, port, ioc, ctx};
+    client.Connect();
+
+    boost::asio::high_resolution_timer timer(ioc);
+    timer.expires_after(std::chrono::milliseconds(250));
+    timer.async_wait([&client](auto ec) {
+        // This test assumes that Close() works.
+        client.Close();
+    });
+
+    ioc.run();
 }
 
 BOOST_AUTO_TEST_SUITE_END(); // Connect
