@@ -223,15 +223,16 @@ public:
                         subscribed_ = true;
                         if (onSubscribe_) onSubscribe_(StompClientError::kOk, "Success");
                     } else if (onSubscribe_) {
-                        onSubscribe_(StompClientError::kError, "Receipt: Invalid headers");
+                        onSubscribe_(StompClientError::kError, "Receipt: Invalid headers -" + msg);
                     }
                 } else if (frame.GetCommand() == StompCommand::kMessage) {
                     bool valid = frame.GetHeaderValue(StompHeader::kSubscription) == subscriptionId_
-                        && frame.GetHeaderValue(StompHeader::kDestination) == endpoint_;
+                        && frame.GetHeaderValue(StompHeader::kDestination) == "/passengers";
                     if (valid) {
                         onMessage_(StompClientError::kOk, std::string(frame.GetBody()));
                     } else {
-                        onMessage_(StompClientError::kError, "Message: Invalid headers");
+                        onMessage_(StompClientError::kError, 
+                            "Message: Invalid headers -" + msg);
                     }
                 } else {
                     onMessage_(StompClientError::kError, "Unable to handle STOMP message");
