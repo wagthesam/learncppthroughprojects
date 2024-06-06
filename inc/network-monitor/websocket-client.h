@@ -94,7 +94,7 @@ public:
      *                 failed to send.
      */
     void Send(
-        std::string_view message,
+        const std::string& message,
         std::function<void (boost::system::error_code)> onSend = nullptr
     ) {
         ws_.async_write(boost::asio::buffer(message), [this, onSend](auto ec, auto bytes_transferred){

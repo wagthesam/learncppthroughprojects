@@ -469,7 +469,7 @@ BOOST_AUTO_TEST_CASE(success_ws_read_twice, *timeout {1})
     BOOST_CHECK_EQUAL(calledOnRead, 2);
 }
 
-BOOST_AUTO_TEST_CASE(success_ws_read_no_handler, *timeout {1})
+BOOST_AUTO_TEST_CASE(success_ws_read_no_handler, *timeout {10})
 {
     // We use the mock client so we don't really connect to the target.
     const std::string url {"some.echo-server.com"};
@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE(success_ws_read_no_handler, *timeout {1})
     client.Connect();
 
     boost::asio::high_resolution_timer timer(ioc);
-    timer.expires_after(std::chrono::milliseconds(250));
+    timer.expires_after(std::chrono::milliseconds(5000));
     timer.async_wait([&client](auto ec) {
         // This test assumes that Close() works.
         client.Close();

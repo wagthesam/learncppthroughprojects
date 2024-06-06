@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iostream>
 
 namespace NetworkMonitor {
 StompFrame::StompFrame(
@@ -153,7 +154,7 @@ void StompFrame::Validate() {
     };
     static const std::unordered_map<StompCommand, std::vector<StompHeader>> optionalHeaders {
         {StompCommand::kConnect, {StompHeader::kLogin, StompHeader::kPasscode, StompHeader::kHeartBeat}},
-        {StompCommand::kConnected, {StompHeader::kSession, StompHeader::kServer, StompHeader::kHeartBeat}},
+        {StompCommand::kConnected, {StompHeader::kSession, StompHeader::kServer, StompHeader::kHeartBeat, StompHeader::kContentType}},
         {StompCommand::kSend, {StompHeader::kTransaction, StompHeader::kContentType}},
         {StompCommand::kSubscribe, {StompHeader::kAck}},
         {StompCommand::kMessage, {StompHeader::kContentType}},
@@ -161,7 +162,7 @@ void StompFrame::Validate() {
         {StompCommand::kNack, {StompHeader::kTransaction}},
         {StompCommand::kDisconnect, {StompHeader::kReceipt}},
         {StompCommand::kMessage, {StompHeader::kAck}},
-        {StompCommand::kError, {StompHeader::kMessage, StompHeader::kContentType}},
+        {StompCommand::kError, {StompHeader::kVersion, StompHeader::kMessage, StompHeader::kContentType}},
     };
 
     auto requiredHeadersIt = requiredHeaders.find(command_);

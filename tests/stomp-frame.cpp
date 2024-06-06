@@ -16,8 +16,6 @@ BOOST_AUTO_TEST_SUITE(network_monitor);
 
 BOOST_AUTO_TEST_SUITE(stomp_frame);
 
-// ...
-
 BOOST_AUTO_TEST_SUITE(class_StompFrame);
 
 BOOST_AUTO_TEST_CASE(parse_well_formed)

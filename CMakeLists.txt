@@ -83,6 +83,7 @@ set(TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/stomp-frame.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/stomp-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/transport-network.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/main.cpp")
 
