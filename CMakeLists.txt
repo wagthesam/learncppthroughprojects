@@ -14,6 +14,26 @@ find_package(absl 20240116.2 REQUIRED)
 
 set(INC "inc")
 
+set(MAIN_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp"
+)
+add_executable(network-monitor-exe ${MAIN_SOURCES})
+target_compile_features(network-monitor-exe
+    PRIVATE
+        cxx_std_17
+)
+target_include_directories(network-monitor-exe
+    PUBLIC
+    ${INC})
+target_link_libraries(network-monitor-exe
+    PUBLIC
+        ${Boost_LIBRARIES}
+        transport-network
+        openssl::openssl
+        nlohmann_json::nlohmann_json
+        stomp
+)
+
 set(STOMP_LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/stomp-frame.cpp"
 )
@@ -105,10 +125,34 @@ target_link_libraries(network-monitor-tests
         transport-network
         stomp
 )
+set(PEM_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
+)
+set(NETWORK_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json")
 target_compile_definitions(network-monitor-tests
     PRIVATE
-        TESTS_CACERT_PEM="${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
-        TESTS_NETWORK_LAYOUT_JSON="${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json"
+        TESTS_CACERT_PEM="${PEM_PATH}"
+        TESTS_NETWORK_LAYOUT_JSON="${NETWORK_PATH}"
 )
 
-add_test(NAME websocket-client-test COMMAND ./network-monitor-tests)
+add_test(NAME network-monitor-tests COMMAND $<TARGET_FILE:network-monitor-tests>)
+set_tests_properties(network-monitor-tests PROPERTIES
+    PASS_REGULAR_EXPRESSION ".* No errors detected"
+)
+
+add_test(NAME network-monitor-exe
+  COMMAND $<TARGET_FILE:network-monitor-exe>
+  --url=ltnm.learncppthroughprojects.com
+  --endpoint=/network-events
+  --port=443
+  --username=$ENV{stomp_username}
+  --password=$ENV{stomp_password}
+  --stomp_endpoint=/passengers
+  --cert_path=${PEM_PATH}
+  --network_layout_path=${NETWORK_PATH}
+  --runtime_s=5
+)
+set_tests_properties(network-monitor-exe PROPERTIES
+    PASS_REGULAR_EXPRESSION "OnConnect \| ok\n OnSubscribe \| ok\n OnClose \| ok\n.*"
+)

@@ -103,6 +103,16 @@ struct PassengerEvent {
 
     Id stationId {};
     Type type {Type::In};
+
+    static std::optional<Type> ToType(const std::string& type) {
+        if (type == "in") {
+            return Type::In;
+        } else if (type == "out") {
+            return Type::Out;
+        } else {
+            return {};
+        }
+    }
 };
 
 /*! \brief Underground network representation

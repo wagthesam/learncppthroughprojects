@@ -13,9 +13,13 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <cstdlib>
 
 using namespace std::literals::string_literals;
 using timeout = boost::unit_test::timeout;
+
+static const std::string USERNAME = std::getenv("stomp_username");
+static const std::string PASSWORD = std::getenv("stomp_password");
 
 BOOST_AUTO_TEST_SUITE(network_monitor);
 
@@ -586,8 +590,8 @@ BOOST_AUTO_TEST_CASE(class_StompClient_integration_test, *timeout {10})
         ioc,
         ctx
     };
-    const std::string username {"shanzhen.hu@gmail.com"};
-    const std::string password {"8573ed476e7f883bc72f858565c617165e0a917e"};
+    const std::string username {USERNAME};
+    const std::string password {PASSWORD};
     bool connected {false};
     bool disconnected {false};
     bool subscribed {false};
@@ -604,19 +608,19 @@ BOOST_AUTO_TEST_CASE(class_StompClient_integration_test, *timeout {10})
                         if (sError == NetworkMonitor::StompClientError::kOk) {
                             subscribed = true;
                         } else {
-                            std::cout << "error!!!!" << msg << std::endl;
+                            std::cout << "error!" << msg << std::endl;
                         }
                     },
                     [&messages](NetworkMonitor::StompClientError sError, std::string&& msg) {
                         if (sError == NetworkMonitor::StompClientError::kOk) {
                             messages.emplace_back(msg);
                         } else {
-                            std::cout << "error!!!!" << msg << std::endl;
+                            std::cout << "error!" << msg << std::endl;
                         }
                     }
                 );
             } else {
-                std::cout << "error!!!!" << msg << std::endl;
+                std::cout << "error!" << msg << std::endl;
             }
         },
         [&disconnected](NetworkMonitor::StompClientError error, std::string&& msg) {

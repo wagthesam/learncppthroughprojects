@@ -118,7 +118,6 @@ public:
             << "passcode:" << password << "\n"
             << "\n"
             << "\0"s;
-
         ws_.Send(ss.str(), 
                 [this](auto ec) {
                     if (ec) {
