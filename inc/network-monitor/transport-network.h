@@ -70,6 +70,40 @@ struct Route {
     bool operator!=(const Route& other) const;
 };
 
+struct Step {
+    Id startStationId {};
+    Id endStationId {};
+    Id lineId {};
+    Id routeId {};
+    unsigned int travelTime {0};
+
+    bool operator==(const Step& other) const;
+};
+
+struct TravelRoute {
+
+    Id startStationId {};
+    Id endStationId {};
+    unsigned int totalTravelTime {0};
+    std::vector<Step> steps {};
+
+    bool operator==(const TravelRoute& other) const;
+};
+
+struct RouteAndLine {
+    Id routeId {};
+    Id lineId {};
+};
+
+struct StationIdAndDistance {
+    Id stationId {};
+    unsigned int distance {};
+
+    bool operator>(const StationIdAndDistance& b) const {
+        return b.distance>distance;
+    }
+};
+
 /*! \brief Network line
  *
  *  A line is a collection of routes serving multiple stations.
@@ -279,6 +313,10 @@ public:
     bool FromJson(
         nlohmann::json&& srcs
     );
+
+    TravelRoute GetFastestTravelRoute(
+        const Id& stationA,
+        const Id& stationB) const;
     private:
         StationNode* GetStationNode(const Id& stationId);
 
@@ -295,6 +333,8 @@ public:
             const unsigned int travelTime);
 
         std::unordered_map<Id, std::shared_ptr<StationNode>> stationIdToNode_;
+
+        unsigned int penalty_ = 5;
 };
 
 } // namespace NetworkMonitor

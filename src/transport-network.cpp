@@ -6,6 +6,9 @@
 
 #include <string>
 #include <vector>
+#include <deque>
+#include <queue>
+#include <limits>
 
 namespace {
     template <class T>
@@ -23,6 +26,27 @@ namespace {
 }
 
 namespace NetworkMonitor {
+
+bool TravelRoute::operator==(const TravelRoute& other) const {
+    bool equal = startStationId == other.startStationId
+        && endStationId == other.endStationId
+        && totalTravelTime == other.totalTravelTime
+        && steps.size() == other.steps.size();
+    for (size_t i = 0; i < steps.size(); i++) {
+        if (!(steps[i] == other.steps[i])) {
+            equal = false;
+        }
+    }
+    return equal;
+}
+
+bool Step::operator==(const Step& other) const {
+    return startStationId == other.startStationId
+        && endStationId == other.endStationId
+        && lineId == other.lineId
+        && routeId == other.routeId
+        && travelTime == other.travelTime;
+}
 
 bool Station::operator==(const Station& other) const {
     return other.id == id && other.name == name;
@@ -271,6 +295,92 @@ bool TransportNetwork::FromJson(
     }
 
     return success;
+}
+
+TravelRoute TransportNetwork::GetFastestTravelRoute(
+        const Id& stationA,
+        const Id& stationB) const {
+    TravelRoute route;
+    route.startStationId = stationA;
+    route.endStationId = stationB;
+    if (stationA == stationB) {
+        route.steps = {{
+            stationA,
+            stationA,
+            {},
+            {},
+            0u
+        }};
+        return route;
+    }
+    std::unordered_map<Id, unsigned int> distanceFromA;
+    std::unordered_map<Id, std::optional<unsigned int>> stationIdToCost;
+    std::unordered_map<Id, std::optional<Id>> stationIdToParent;
+    std::unordered_map<Id, std::optional<RouteAndLine>> stationIdFromRoute;
+    for (const auto& [stationId, _] : stationIdToNode_) {
+        distanceFromA[stationId] = stationId == stationA ? 0 : std::numeric_limits<unsigned int>::max();
+        stationIdToParent[stationId] = {};
+        stationIdFromRoute[stationId] = {};
+        stationIdToCost[stationId] = {};
+    }
+    std::priority_queue<
+        StationIdAndDistance,
+        std::deque<StationIdAndDistance>,
+        std::greater<StationIdAndDistance>> nodesToVisit;
+    nodesToVisit.push({stationA, 0});
+
+    while (!nodesToVisit.empty()) {
+        auto stationId = nodesToVisit.top().stationId;
+        auto distance = nodesToVisit.top().distance;
+        nodesToVisit.pop();
+
+        if (stationId == stationB) {
+            break;
+        }
+
+        // get neighbors
+        for (const auto& [neighborId, routesMetadata] : GetStationNode(stationId)->GetStationIdToRoutesMetadata()) {
+            // get routes
+            for (const auto& routeMetadata : routesMetadata) {
+                RouteAndLine routeAndLine {routeMetadata.routeId, routeMetadata.lineId};
+                unsigned int neighborDistance = distance + routeMetadata.travelTime;
+                unsigned int stepCost = routeMetadata.travelTime;
+                if (stationIdFromRoute[stationId].has_value()
+                    && stationIdFromRoute[stationId].value().routeId != routeAndLine.routeId
+                    && stationIdFromRoute[stationId].value().lineId != routeAndLine.lineId) {
+                    neighborDistance += penalty_;
+                    stepCost += penalty_;
+                }
+                if (neighborDistance < distanceFromA[neighborId]) {
+                    stationIdFromRoute[neighborId] = routeAndLine;
+                    stationIdToParent[neighborId] = stationId;
+                    distanceFromA[neighborId] = neighborDistance;
+                    stationIdToCost[neighborId] = stepCost;
+                    nodesToVisit.push({neighborId, neighborDistance});
+                }
+            }
+        }
+    }
+
+    if (distanceFromA[stationB] == std::numeric_limits<unsigned int>::max()) {
+        return route;
+    }
+
+    for (auto currentStationId = stationB;
+            currentStationId != stationA;
+            currentStationId = stationIdToParent[currentStationId].value()) {
+        if (stationIdToParent[currentStationId].has_value()) {
+            route.steps.push_back({
+                stationIdToParent[currentStationId].value(),
+                currentStationId,
+                stationIdFromRoute[currentStationId].value().lineId,
+                stationIdFromRoute[currentStationId].value().routeId,
+                stationIdToCost[currentStationId].value()
+            });
+        }
+    }
+    std::reverse(route.steps.begin(), route.steps.end());
+    return route;
 }
 
 } // namespace NetworkMonitor

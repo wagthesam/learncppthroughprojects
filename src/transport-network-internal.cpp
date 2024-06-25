@@ -14,6 +14,20 @@ namespace NetworkMonitor {
         return true;
     }
 
+    std::vector<RouteMetadata> RouteEdge::GetRouteMetadata() const {
+        std::vector<RouteMetadata> routeMetadatas;
+        for (auto& [lineId, routeIds] : lineToRouteIds_) {
+            for (auto& routeId : routeIds) {
+                routeMetadatas.emplace_back(
+                    lineId,
+                    routeId,
+                    travelTime_
+                );
+            }
+        }
+        return routeMetadatas;
+    }
+
     bool RouteEdge::HasRoute(const Id& lineId, const Id& routeId) const {
         auto routes = GetRoutes(lineId);
         return std::find(routes.begin(), routes.end(), routeId) != routes.end();
@@ -79,5 +93,13 @@ namespace NetworkMonitor {
             }
         }
         return {routes.begin(), routes.end()};
+    }
+
+    std::unordered_map<Id, std::vector<RouteMetadata>> StationNode::GetStationIdToRoutesMetadata() const {
+        std::unordered_map<Id, std::vector<RouteMetadata>> metadataMap;
+        for (auto& [stationId, edgePtr] : toStationIdToEdge_) {
+            metadataMap[stationId] = edgePtr->GetRouteMetadata();
+        }
+        return metadataMap;
     }
 }

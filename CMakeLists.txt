@@ -130,10 +130,13 @@ set(PEM_PATH
 )
 set(NETWORK_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json")
+set(TESTS_NETWORK_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/network-test-files")
 target_compile_definitions(network-monitor-tests
     PRIVATE
         TESTS_CACERT_PEM="${PEM_PATH}"
         TESTS_NETWORK_LAYOUT_JSON="${NETWORK_PATH}"
+        TESTS_NETWORK_FILES="${TESTS_NETWORK_FILES}"
 )
 
 add_test(NAME network-monitor-tests COMMAND $<TARGET_FILE:network-monitor-tests>)

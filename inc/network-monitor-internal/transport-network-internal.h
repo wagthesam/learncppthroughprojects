@@ -7,6 +7,15 @@
 #include <unordered_set>
 
 namespace NetworkMonitor {
+    struct RouteMetadata {
+        Id lineId;
+        Id routeId;
+        unsigned int travelTime;
+        
+        RouteMetadata(Id lineId, Id routeId, unsigned int travelTime)
+            : lineId(lineId), routeId(routeId), travelTime(travelTime) {}
+    };
+
     struct RouteEdge {
         bool AddRoute(const Id& routeId, const Id& lineId);
 
@@ -15,6 +24,8 @@ namespace NetworkMonitor {
         std::vector<Id> GetRoutes(const Id& lineId) const;
 
         std::vector<Id> GetRoutes() const;
+
+        std::vector<RouteMetadata> GetRouteMetadata() const;
 
         unsigned int travelTime_;
         std::unordered_map<Id, std::vector<Id>> lineToRouteIds_;
@@ -28,6 +39,8 @@ namespace NetworkMonitor {
         RouteEdge* GetEdge(const Id& stationId);
 
         const RouteEdge* GetEdge(const Id& stationId) const;
+
+        std::unordered_map<Id, std::vector<RouteMetadata>> GetStationIdToRoutesMetadata() const;
 
         std::vector<Id> GetRoutes() const;
 

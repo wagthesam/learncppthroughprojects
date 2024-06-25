@@ -1,4 +1,5 @@
 #include <network-monitor/transport-network.h>
+#include <transport-network-tester.h>
 
 #include <boost/test/unit_test.hpp>
 #include <nlohmann/json.hpp>
