@@ -9,6 +9,7 @@
 #include <deque>
 #include <queue>
 #include <limits>
+#include <functional>
 
 namespace {
     template <class T>
@@ -313,79 +314,71 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         }};
         return route;
     }
-    std::unordered_map<Id, unsigned int> distanceFromA;
-    std::unordered_map<Id, std::optional<unsigned int>> stationIdToCost;
-    std::unordered_map<Id, std::optional<Id>> stationIdToParent;
-    std::unordered_map<Id, std::optional<RouteAndLine>> stationIdFromRoute;
-    for (const auto& [stationId, _] : stationIdToNode_) {
-        distanceFromA[stationId] = stationId == stationA ? 0 : std::numeric_limits<unsigned int>::max();
-        stationIdToParent[stationId] = {};
-        stationIdFromRoute[stationId] = {};
-        stationIdToCost[stationId] = {};
-    }
+    std::unordered_map<GraphStop, unsigned int, GraphStopHash, GraphStopEqual> distanceFromA;
+    std::unordered_map<GraphStop, GraphStop, GraphStopHash, GraphStopEqual> stationIdToParent;
+    distanceFromA[{stationA, {}, {}}] = 0;
     std::priority_queue<
-        StationIdAndDistance,
-        std::deque<StationIdAndDistance>,
-        std::greater<StationIdAndDistance>> nodesToVisit;
-    nodesToVisit.push({stationA, 0});
+        GraphStopDistance,
+        std::deque<GraphStopDistance>,
+        std::greater<GraphStopDistance>> nodesToVisit;
+    nodesToVisit.push({{stationA, {}, {}}, 0});
 
     while (!nodesToVisit.empty()) {
-        auto stationId = nodesToVisit.top().stationId;
+        auto currentStop = nodesToVisit.top().graphStop;
         auto distance = nodesToVisit.top().distance;
         nodesToVisit.pop();
 
-        if (stationId == stationB) {
-            break;
-        }
-
         // get neighbors
-        auto stationNode = GetStationNode(stationId);
-
+        auto stationNode = GetStationNode(currentStop.stationId);
         for (const auto& [neighborId, routesMetadata] : stationNode->GetStationIdToRoutesMetadata()) {
             // get routes
             for (const auto& routeMetadata : routesMetadata) {
-                RouteAndLine routeAndLine {routeMetadata.routeId, routeMetadata.lineId};
                 unsigned int neighborDistance = distance + routeMetadata.travelTime;
                 unsigned int stepCost = routeMetadata.travelTime;
-                if (stationIdFromRoute[stationId].has_value()
-                    && stationIdFromRoute[stationId].value().routeId != routeAndLine.routeId
-                    && stationIdFromRoute[stationId].value().lineId != routeAndLine.lineId) {
+                if (currentStop.routeId.has_value()
+                    && currentStop.routeId.value() != routeMetadata.routeId
+                    && currentStop.lineId.value() != routeMetadata.lineId) {
                     neighborDistance += penalty_;
                     stepCost += penalty_;
                 }
-
-                if (neighborDistance < distanceFromA[neighborId]) {
-                    stationIdFromRoute[neighborId] = routeAndLine;
-                    stationIdToParent[neighborId] = stationId;
-                    distanceFromA[neighborId] = neighborDistance;
-                    stationIdToCost[neighborId] = stepCost;
-                    nodesToVisit.push({neighborId, neighborDistance});
+                GraphStop neighborStop {neighborId, routeMetadata.routeId, routeMetadata.lineId};
+                if (distanceFromA.find(neighborStop) == distanceFromA.end() 
+                    || neighborDistance < distanceFromA[neighborStop]) {
+                    stationIdToParent[neighborStop] = currentStop;
+                    distanceFromA[neighborStop] = neighborDistance;
+                    nodesToVisit.push({{neighborId, routeMetadata.routeId, routeMetadata.lineId}, neighborDistance});
                 }
             }
         }
     }
 
-    if (distanceFromA[stationB] == std::numeric_limits<unsigned int>::max()) {
+    std::vector<GraphStopDistance> pathsToB {};
+    for (const auto& [stop, distance]: distanceFromA) {
+        if (stop.stationId == stationB) {
+            pathsToB.push_back({stop, distance});
+        }
+    }
+
+    if (pathsToB.empty()) {
         return route;
     }
 
+    std::sort(pathsToB.begin(), pathsToB.end(), std::less<GraphStopDistance>());
+
     unsigned int totalTravelTime = 0u;
-    for (auto currentStationId = stationB;
-            currentStationId != stationA;
-            currentStationId = stationIdToParent[currentStationId].value()) {
-        if (stationIdToParent[currentStationId].has_value()) {
-            route.steps.push_back({
-                stationIdToParent[currentStationId].value(),
-                currentStationId,
-                stationIdFromRoute[currentStationId].value().lineId,
-                stationIdFromRoute[currentStationId].value().routeId,
-                stationIdToCost[currentStationId].value()
-            });
-            totalTravelTime += stationIdToCost[currentStationId].value();
-        }
+    for (auto currentStop = pathsToB[0].graphStop;
+            currentStop.stationId != stationA;
+            currentStop = stationIdToParent[currentStop]) {
+        route.steps.push_back({
+            stationIdToParent[currentStop].stationId,
+            currentStop.stationId,
+            currentStop.lineId.value(),
+            currentStop.routeId.value(),
+            distanceFromA[currentStop]-distanceFromA[stationIdToParent[currentStop]]
+        });
     }
     std::reverse(route.steps.begin(), route.steps.end());
-    route.totalTravelTime = totalTravelTime;
+    route.totalTravelTime = distanceFromA[pathsToB[0].graphStop];
     return route;
 }
 

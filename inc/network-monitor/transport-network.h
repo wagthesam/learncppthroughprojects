@@ -109,21 +109,51 @@ struct TravelRoute {
         for (const auto& step : travelRoute.steps) {
             os << step << "\n";
         }
-        os << "************" << "\n";
+        os << "************" << "\n";   
         return os;
     }
 };
 
-struct RouteAndLine {
-    Id routeId {};
-    Id lineId {};
+struct GraphStop {
+    Id stationId {};
+    std::optional<Id> routeId {};
+    std::optional<Id> lineId {};
+
+    // Define equality operator
+    bool operator==(const GraphStop& other) const {
+        return stationId == other.stationId &&
+               routeId == other.routeId &&
+               lineId == other.lineId;
+    }
 };
 
-struct StationIdAndDistance {
-    Id stationId {};
+struct GraphStopHash {
+    size_t operator()(const GraphStop& gs) const {
+        size_t h1 = std::hash<Id>{}(gs.stationId);
+        size_t h2 = gs.routeId ? std::hash<Id>{}(*gs.routeId) : 0;
+        size_t h3 = gs.lineId ? std::hash<Id>{}(*gs.lineId) : 0;
+        return h1 ^ (h2 << 1) ^ (h3 << 2);
+    }
+};
+
+// Custom equality function
+struct GraphStopEqual {
+    bool operator()(const GraphStop& lhs, const GraphStop& rhs) const {
+        return lhs.stationId == rhs.stationId &&
+               lhs.routeId == rhs.routeId &&
+               lhs.lineId == rhs.lineId;
+    }
+};
+
+struct GraphStopDistance {
+    GraphStop graphStop {};
     unsigned int distance {};
 
-    bool operator>(const StationIdAndDistance& b) const {
+    bool operator>(const GraphStopDistance  & b) const {
+        return b.distance>distance;
+    }
+
+    bool operator<(const GraphStopDistance  & b) const {
         return b.distance>distance;
     }
 };
