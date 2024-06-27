@@ -339,7 +339,9 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         }
 
         // get neighbors
-        for (const auto& [neighborId, routesMetadata] : GetStationNode(stationId)->GetStationIdToRoutesMetadata()) {
+        auto stationNode = GetStationNode(stationId);
+
+        for (const auto& [neighborId, routesMetadata] : stationNode->GetStationIdToRoutesMetadata()) {
             // get routes
             for (const auto& routeMetadata : routesMetadata) {
                 RouteAndLine routeAndLine {routeMetadata.routeId, routeMetadata.lineId};
@@ -351,6 +353,7 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
                     neighborDistance += penalty_;
                     stepCost += penalty_;
                 }
+
                 if (neighborDistance < distanceFromA[neighborId]) {
                     stationIdFromRoute[neighborId] = routeAndLine;
                     stationIdToParent[neighborId] = stationId;
@@ -366,6 +369,7 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         return route;
     }
 
+    unsigned int totalTravelTime = 0u;
     for (auto currentStationId = stationB;
             currentStationId != stationA;
             currentStationId = stationIdToParent[currentStationId].value()) {
@@ -377,9 +381,11 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
                 stationIdFromRoute[currentStationId].value().routeId,
                 stationIdToCost[currentStationId].value()
             });
+            totalTravelTime += stationIdToCost[currentStationId].value();
         }
     }
     std::reverse(route.steps.begin(), route.steps.end());
+    route.totalTravelTime = totalTravelTime;
     return route;
 }
 

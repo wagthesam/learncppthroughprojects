@@ -78,6 +78,17 @@ struct Step {
     unsigned int travelTime {0};
 
     bool operator==(const Step& other) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const Step& step) {
+        os << "************" << "\n"
+            << "Start Station ID: " << step.startStationId << "\n"
+           << "End Station ID: " << step.endStationId << "\n"
+           << "Line ID: " << step.lineId << "\n"
+           << "Route ID: " << step.routeId << "\n"
+           << "Travel Time: " << step.travelTime << "\n"
+            << "************" << "\n";
+        return os;
+    }
 };
 
 struct TravelRoute {
@@ -88,6 +99,19 @@ struct TravelRoute {
     std::vector<Step> steps {};
 
     bool operator==(const TravelRoute& other) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const TravelRoute& travelRoute) {
+        os << "************" << "\n"
+            << "Start Station ID: " << travelRoute.startStationId << "\n"
+           << "End Station ID: " << travelRoute.endStationId << "\n"
+           << "Total Travel Time: " << travelRoute.totalTravelTime << "\n"
+           << "Steps:\n";
+        for (const auto& step : travelRoute.steps) {
+            os << step << "\n";
+        }
+        os << "************" << "\n";
+        return os;
+    }
 };
 
 struct RouteAndLine {

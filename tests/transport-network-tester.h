@@ -8,30 +8,28 @@
 #include <utility>
 #include <fstream>
 
+
 namespace NetworkMonitor {
 
 void from_json(const nlohmann::json& j, Step& s) {
-    s.startStationId = j.at("startStationId").get<Id>();
-    s.endStationId = j.at("endStationId").get<Id>();
-    s.lineId = j.at("lineId").get<Id>();
-    s.routeId = j.at("routeId").get<Id>();
-    s.travelTime = j.at("travelTime").get<unsigned int>();
+    s.startStationId = j.at("start_station_id").get<Id>();
+    s.endStationId = j.at("end_station_id").get<Id>();
+    s.lineId = j.at("line_id").get<Id>();
+    s.routeId = j.at("route_id").get<Id>();
+    s.travelTime = j.at("travel_time").get<unsigned int>();
 }
 
 void from_json(const nlohmann::json& j, TravelRoute& tr) {
-    tr.startStationId = j.at("startStationId").get<Id>();
-    tr.endStationId = j.at("endStationId").get<Id>();
-    tr.totalTravelTime = j.at("totalTravelTime").get<unsigned int>();
-    const auto& steps = j.at("steps");
-    tr.steps.clear();
-    for (const auto& step : steps) {
-        tr.steps.push_back(step.get<Step>());
-    }
+    tr.startStationId = j.at("start_station_id").get<Id>();
+    tr.endStationId = j.at("end_station_id").get<Id>();
+    tr.totalTravelTime = j.at("total_travel_time").get<unsigned int>();
+    j.at("steps").get_to(tr.steps);
 }
 
 std::pair<TransportNetwork, TravelRoute> GetTestNetwork(
     const std::string& filenameExt,
-    bool useOriginalNetworkLayoutFile = false
+    bool useOriginalNetworkLayoutFile = false,
+    bool hasResultsFile = true
 ) {
     auto file = useOriginalNetworkLayoutFile 
         ? std::filesystem::path {TESTS_NETWORK_LAYOUT_JSON}
@@ -46,6 +44,12 @@ std::pair<TransportNetwork, TravelRoute> GetTestNetwork(
     auto routesJson = ParseJsonFile(routesFile);
     BOOST_REQUIRE(routesJson != nlohmann::json::object());
     TravelRoute travelRoute;
+    if (!hasResultsFile) {
+        return {
+            std::move(network),
+            std::move(travelRoute)
+        };
+    }
     try {
         travelRoute = routesJson.get<TravelRoute>();
     } catch (...) {

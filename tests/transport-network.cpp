@@ -540,6 +540,40 @@ BOOST_AUTO_TEST_CASE(json)
     BOOST_CHECK(ok);
 }
 
+BOOST_AUTO_TEST_CASE(network_fastest_path_1route)
+{
+    auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_1route");
+    auto fastestRoute = nw.GetFastestTravelRoute("station_A", "station_B");
+    BOOST_CHECK(route == fastestRoute);
+}
+
+BOOST_AUTO_TEST_CASE(network_fastest_path_2routes_overlap)
+{
+    auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_2routes_overlap");
+    auto fastestRoute = nw.GetFastestTravelRoute("station_A", "station_B");
+    std::cout << route;
+    std::cout << "HHHHHHHHHHHHHHHHHH" << std::endl;
+    std::cout << fastestRoute;
+    BOOST_CHECK(route == fastestRoute);
+}
+
+BOOST_AUTO_TEST_CASE(network_fastest_path_2routes)
+{
+    auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_2routes");
+    auto fastestRoute = nw.GetFastestTravelRoute("station_A", "station_B");
+    BOOST_CHECK(route == fastestRoute);
+}
+
+BOOST_AUTO_TEST_CASE(network_fastest_path_missing_station)
+{
+    auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_missing_station", false, false);
+}
+
+BOOST_AUTO_TEST_CASE(network_fastest_path_no_path)
+{
+    auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_no_path", false, false);
+}
+
 BOOST_AUTO_TEST_SUITE_END(); // TravelTime
 
 BOOST_AUTO_TEST_SUITE_END(); // class_TransportNetwork
