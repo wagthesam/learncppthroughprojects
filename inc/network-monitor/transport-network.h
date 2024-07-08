@@ -109,7 +109,7 @@ struct TravelRoute {
         for (const auto& step : travelRoute.steps) {
             os << step << "\n";
         }
-        os << "************" << "\n";   
+        os << "************" << "\n";
         return os;
     }
 };
@@ -145,16 +145,16 @@ struct GraphStopEqual {
     }
 };
 
-struct GraphStopDistance {
+struct GraphStopMetric {
     GraphStop graphStop {};
-    unsigned int distance {};
+    unsigned int metric {};
 
-    bool operator>(const GraphStopDistance  & b) const {
-        return b.distance>distance;
+    bool operator>(const GraphStopMetric  & b) const {
+        return metric>b.metric;
     }
 
-    bool operator<(const GraphStopDistance  & b) const {
-        return b.distance>distance;
+    bool operator<(const GraphStopMetric  & b) const {
+        return metric<b.metric;
     }
 };
 
@@ -371,6 +371,10 @@ public:
     TravelRoute GetFastestTravelRoute(
         const Id& stationA,
         const Id& stationB) const;
+
+    TravelRoute GetQuietTravelRoute(
+        const Id& stationA,
+        const Id& stationB) const;
     private:
         StationNode* GetStationNode(const Id& stationId);
 
@@ -385,6 +389,11 @@ public:
             const Id& stationA,
             const Id& stationB,
             const unsigned int travelTime);
+
+        TravelRoute GetOptimalTravelRoute(
+            const Id& stationA,
+            const Id& stationB,
+            bool useDistance) const;
 
         std::unordered_map<Id, std::shared_ptr<StationNode>> stationIdToNode_;
 

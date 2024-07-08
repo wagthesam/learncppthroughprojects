@@ -551,9 +551,6 @@ BOOST_AUTO_TEST_CASE(network_fastest_path_2routes_overlap)
 {
     auto [nw, route]  = NetworkMonitor::GetTestNetwork("network_fastest_path_2routes_overlap");
     auto fastestRoute = nw.GetFastestTravelRoute("station_A", "station_B");
-    std::cout << route;
-    std::cout << "HHHHHHHHHHHHHHHHHH" << std::endl;
-    std::cout << fastestRoute;
     BOOST_CHECK(route == fastestRoute);
 }
 

@@ -298,9 +298,10 @@ bool TransportNetwork::FromJson(
     return success;
 }
 
-TravelRoute TransportNetwork::GetFastestTravelRoute(
+TravelRoute TransportNetwork::GetOptimalTravelRoute(
         const Id& stationA,
-        const Id& stationB) const {
+        const Id& stationB,
+        bool useDistance) const {
     TravelRoute route;
     route.startStationId = stationA;
     route.endStationId = stationB;
@@ -314,18 +315,20 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         }};
         return route;
     }
+    std::unordered_map<GraphStop, unsigned int, GraphStopHash, GraphStopEqual> metricFromA;
     std::unordered_map<GraphStop, unsigned int, GraphStopHash, GraphStopEqual> distanceFromA;
     std::unordered_map<GraphStop, GraphStop, GraphStopHash, GraphStopEqual> stationIdToParent;
+    metricFromA[{stationA, {}, {}}] = 0;
     distanceFromA[{stationA, {}, {}}] = 0;
     std::priority_queue<
-        GraphStopDistance,
-        std::deque<GraphStopDistance>,
-        std::greater<GraphStopDistance>> nodesToVisit;
+        GraphStopMetric,
+        std::deque<GraphStopMetric>,
+        std::greater<GraphStopMetric>> nodesToVisit;
     nodesToVisit.push({{stationA, {}, {}}, 0});
 
     while (!nodesToVisit.empty()) {
-        auto currentStop = nodesToVisit.top().graphStop;
-        auto distance = nodesToVisit.top().distance;
+        const auto currentStop = nodesToVisit.top().graphStop;
+        const auto metric = nodesToVisit.top().metric;
         nodesToVisit.pop();
 
         // get neighbors
@@ -333,29 +336,30 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         for (const auto& [neighborId, routesMetadata] : stationNode->GetStationIdToRoutesMetadata()) {
             // get routes
             for (const auto& routeMetadata : routesMetadata) {
-                unsigned int neighborDistance = distance + routeMetadata.travelTime;
-                unsigned int stepCost = routeMetadata.travelTime;
+                const GraphStop neighborStop {neighborId, routeMetadata.routeId, routeMetadata.lineId};
+                unsigned int neighborMetric = metric + (useDistance ? routeMetadata.travelTime : GetPassengerCount(neighborId));
+                unsigned int neighborDistance = distanceFromA[currentStop] + routeMetadata.travelTime;
                 if (currentStop.routeId.has_value()
                     && currentStop.routeId.value() != routeMetadata.routeId
                     && currentStop.lineId.value() != routeMetadata.lineId) {
+                    neighborMetric += useDistance ? penalty_ : GetPassengerCount(neighborId);
                     neighborDistance += penalty_;
-                    stepCost += penalty_;
                 }
-                GraphStop neighborStop {neighborId, routeMetadata.routeId, routeMetadata.lineId};
-                if (distanceFromA.find(neighborStop) == distanceFromA.end() 
-                    || neighborDistance < distanceFromA[neighborStop]) {
+                if (metricFromA.find(neighborStop) == metricFromA.end() 
+                    || neighborMetric < metricFromA[neighborStop]) {
                     stationIdToParent[neighborStop] = currentStop;
+                    metricFromA[neighborStop] = neighborMetric;
+                    nodesToVisit.push({neighborStop, neighborMetric});
                     distanceFromA[neighborStop] = neighborDistance;
-                    nodesToVisit.push({{neighborId, routeMetadata.routeId, routeMetadata.lineId}, neighborDistance});
                 }
             }
         }
     }
 
-    std::vector<GraphStopDistance> pathsToB {};
-    for (const auto& [stop, distance]: distanceFromA) {
+    std::vector<GraphStopMetric> pathsToB {};
+    for (const auto& [stop, metric]: metricFromA) {
         if (stop.stationId == stationB) {
-            pathsToB.push_back({stop, distance});
+            pathsToB.push_back({stop, metric});
         }
     }
 
@@ -363,9 +367,8 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
         return route;
     }
 
-    std::sort(pathsToB.begin(), pathsToB.end(), std::less<GraphStopDistance>());
+    std::sort(pathsToB.begin(), pathsToB.end(), std::less<GraphStopMetric>());
 
-    unsigned int totalTravelTime = 0u;
     for (auto currentStop = pathsToB[0].graphStop;
             currentStop.stationId != stationA;
             currentStop = stationIdToParent[currentStop]) {
@@ -377,9 +380,25 @@ TravelRoute TransportNetwork::GetFastestTravelRoute(
             distanceFromA[currentStop]-distanceFromA[stationIdToParent[currentStop]]
         });
     }
-    std::reverse(route.steps.begin(), route.steps.end());
     route.totalTravelTime = distanceFromA[pathsToB[0].graphStop];
+    std::reverse(route.steps.begin(), route.steps.end());
     return route;
+}
+
+TravelRoute TransportNetwork::GetFastestTravelRoute(
+        const Id& stationA,
+        const Id& stationB) const {
+    return GetOptimalTravelRoute(stationA, stationB, true);
+}
+
+TravelRoute TransportNetwork::GetQuietTravelRoute(
+        const Id& stationA,
+        const Id& stationB) const {
+    auto fastestRoute = GetOptimalTravelRoute(stationA, stationB, true);
+    auto quietestRoute = GetOptimalTravelRoute(stationA, stationB, false);
+    return fastestRoute.totalTravelTime * 1.2 > static_cast<double>(quietestRoute.totalTravelTime)
+        ? quietestRoute 
+        : fastestRoute;
 }
 
 } // namespace NetworkMonitor
