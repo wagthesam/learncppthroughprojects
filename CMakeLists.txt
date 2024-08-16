@@ -100,6 +100,7 @@ target_link_libraries(file-downloader
 enable_testing()
 
 set(TEST_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-server.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/websocket-client.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/file-downloader.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/stomp-frame.cpp"

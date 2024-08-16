@@ -6,6 +6,7 @@
 #include <boost/beast/ssl/ssl_stream.hpp>
 
 #include <iostream>
+#include <string>
 
 namespace NetworkMonitor {
 
