@@ -30,20 +30,21 @@ static std::string generateRandomString(size_t length) {
 template <typename WebSocketStream>
 class WebSocketSession : public std::enable_shared_from_this<WebSocketSession<WebSocketStream>> {
 public:
+    using ConnectHandler = std::function<void (boost::system::error_code, const std::string&)>;
+    using MessageHandler = std::function<std::vector<std::string> (boost::system::error_code,
+                                                                    std::string&&,
+                                                                    const std::string&)>;
+    using DisconnectHandler = std::function<void (boost::system::error_code, const std::string&)>;
     WebSocketSession(
             boost::asio::ip::tcp::socket socket,
             boost::asio::ssl::context& ctx,
-            std::function<void (boost::system::error_code, const std::string&)> onConnect = nullptr,
-            std::function<std::vector<std::string> (boost::system::error_code,
-                                                    std::string&&,
-                                                    const std::string&)> onMessage = nullptr,
-            std::function<void (boost::system::error_code, const std::string&)> onDisconnect = nullptr,
-            std::function<void (boost::system::error_code, const std::string&)> onSend = nullptr) : 
+            ConnectHandler onConnect = nullptr,
+            MessageHandler onMessage = nullptr,
+            DisconnectHandler onDisconnect = nullptr) : 
             ws_{std::move(socket), ctx},
             onConnect_(onConnect),
             onMessage_(onMessage),
             onDisconnect_(onDisconnect),
-            onSend_(onSend),
             session_id_(generateRandomString(10)) {}
 
     void Init() {
@@ -147,7 +148,6 @@ private:
                 Log("Send", ec);
                 return;
             }
-            onSend_(ec, session_id_);
         });
     }
     void Log(std::string_view ref, const boost::system::error_code& ec) {
@@ -163,43 +163,66 @@ private:
                                             std::string&&,
                                             const std::string&)> onMessage_ {nullptr};
     std::function<void (boost::system::error_code, const std::string&)> onDisconnect_ {nullptr};
-    std::function<void (boost::system::error_code, const std::string&)> onSend_ {nullptr};
     bool closed_{false};
     std::string session_id_;
     
     boost::beast::flat_buffer buffer_;
 };
 
-template <typename WebSocketStream>
+template <typename WebSocketStream, typename Acceptor>
 class WebSocketServer {
 public:
+    using Session = WebSocketSession<WebSocketStream>;
+    using ServerDisconnectHandler = std::function<void (boost::system::error_code)>;
     WebSocketServer(
         boost::asio::io_context& ioc,
         boost::asio::ssl::context& ctx,
-        boost::asio::ip::tcp::acceptor& acceptor,
+        Acceptor& acceptor,
         boost::asio::ip::tcp::endpoint& endpoint
     ) : ioc_(ioc), ctx_(ctx), acceptor_(std::move(acceptor)), endpoint_(std::move(endpoint)) {}
 
-    void Init(
-        std::function<void (boost::system::error_code, const std::string&)> onConnect = nullptr,
-        std::function<std::vector<std::string> (boost::system::error_code,
-                                                std::string&&,
-                                                const std::string&)> onMessage = nullptr,
-        std::function<void (boost::system::error_code, const std::string&)> onDisconnect = nullptr,
-        std::function<void (boost::system::error_code, const std::string&)> onSend = nullptr) {
+    boost::system::error_code Run(
+        typename Session::ConnectHandler onConnect = nullptr,
+        typename Session::MessageHandler onMessage = nullptr,
+        typename Session::DisconnectHandler onDisconnect = nullptr,
+        typename Session::ServerDisconnectHandler onServerDisconnect = nullptr) {
         onConnect_ = onConnect;
         onDisconnect_ = onDisconnect;
         onMessage_ = onMessage;
-        onSend_ = onSend;
-        acceptor_.open(endpoint_.protocol());
-        acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
-        acceptor_.bind(endpoint_);
-        acceptor_.listen();
-        DoAccept();
+        onServerDisconnect_ = onServerDisconnect;
+        boost::system::error_code ec;
+        acceptor_.open(endpoint_.protocol(), ec);
+        if (ec) {
+            Log("WebSocketServer: Could not open endpoint: " + ec.message());
+            return ec;
+        }
+        acceptor_.set_option(Acceptor::reuse_address(true), ec);
+        if (ec) {
+            Log("WebSocketServer: Could not set re-use address option: " + ec.message());
+            return ec;
+        }
+        acceptor_.bind(endpoint_, ec);
+        if (ec) {
+            Log("WebSocketServer: Could not bind to endpoint: " + ec.message());
+            return ec;
+        }
+        acceptor_.listen(ec);
+        if (ec) {
+            Log("WebSocketServer: Could not listen to endpoint: " + ec.message());
+            return ec;
+        }
+        closed_ = false;
+        DoAccept(ec);
     }
 private:
-    void DoAccept() {
-        acceptor_.async_accept(ioc_, 
+    void DoAccept(boost::system::error_code ec) {
+        if (ec) {
+            Log("DoAccept", ec);
+            if (!closed_ && onServerDisconnect_ != nullptr) {
+                onServerDisconnect_(ec);
+            }
+        }
+        acceptor_.async_accept(boost::asio::make_strand(ioc_), 
             [this](auto&& ec, auto&& socket) {
                 OnAsyncAccept(ec, socket);
             }
@@ -221,7 +244,7 @@ private:
                     socket)
             )
         );
-        DoAccept();
+        DoAccept(ec);
     }
 
     void CreateSession(
@@ -242,8 +265,7 @@ private:
                 ctx_,
                 onConnect_,
                 onMessage_,
-                onDisconnect_,
-                onSend_);
+                onDisconnect_);
         session->Init();
         return;
     }
@@ -255,16 +277,30 @@ private:
                 << std::endl;
     }
 
-    std::function<void (boost::system::error_code, const std::string&)> onConnect_ {nullptr};
-    std::function<std::vector<std::string> (boost::system::error_code,
-                                            std::string&&,
-                                            const std::string&)> onMessage_ {nullptr};
-    std::function<void (boost::system::error_code, const std::string&)> onDisconnect_ {nullptr};
-    std::function<void (boost::system::error_code, const std::string&)> onSend_ {nullptr};
+    void Log(std::string_view msg) {
+        std::cout << msg
+                << std::endl;
+    }
 
-    boost::asio::ip::tcp::acceptor acceptor_;
+    void Stop() {
+        if (!closed_) {
+            closed_ = true;
+            auto ec = acceptor_.close();
+            if (onServerDisconnect_ != nullptr) {
+                onServerDisconnect_(ec);
+            }
+        }
+    }
+
+    typename Session::ConnectHandler onConnect_ {nullptr};
+    typename Session::MessageHandler onMessage_ {nullptr};
+    typename Session::DisconnectHandler onDisconnect_ {nullptr};
+    ServerDisconnectHandler onServerDisconnect_ {nullptr};
+
+    Acceptor acceptor_;
     boost::asio::ip::tcp::endpoint endpoint_;
     boost::asio::io_context& ioc_;
     boost::asio::ssl::context& ctx_;
+    bool closed_{true};
 };
 };

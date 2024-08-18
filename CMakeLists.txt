@@ -129,6 +129,9 @@ target_link_libraries(network-monitor-tests
 set(PEM_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/cacert.pem"
 )
+set(TESTS_CACERT_PEM
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/server_certificate.hpp"
+)
 set(NETWORK_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/network-layout.json")
 set(TESTS_NETWORK_FILES
