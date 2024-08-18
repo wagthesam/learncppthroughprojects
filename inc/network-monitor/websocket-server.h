@@ -8,8 +8,24 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <cstdlib>
+#include <ctime>
+
 
 namespace NetworkMonitor {
+
+static std::string generateRandomString(size_t length) {
+    const std::string characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    std::string randomString;
+    
+    std::srand(std::time(0)); // Use current time as seed for random generator
+    
+    for (size_t i = 0; i < length; ++i) {
+        randomString += characters[std::rand() % characters.length()];
+    }
+    
+    return randomString;
+}
 
 template <typename WebSocketStream>
 class WebSocketSession : public std::enable_shared_from_this<WebSocketSession<WebSocketStream>> {
@@ -17,16 +33,18 @@ public:
     WebSocketSession(
             boost::asio::ip::tcp::socket socket,
             boost::asio::ssl::context& ctx,
-            std::function<void (boost::system::error_code)> onConnect = nullptr,
+            std::function<void (boost::system::error_code, const std::string&)> onConnect = nullptr,
             std::function<std::vector<std::string> (boost::system::error_code,
-                                                    std::string&&)> onMessage = nullptr,
-            std::function<void (boost::system::error_code)> onDisconnect = nullptr,
-            std::function<void (boost::system::error_code)> onSend = nullptr) : 
+                                                    std::string&&,
+                                                    const std::string&)> onMessage = nullptr,
+            std::function<void (boost::system::error_code, const std::string&)> onDisconnect = nullptr,
+            std::function<void (boost::system::error_code, const std::string&)> onSend = nullptr) : 
             ws_{std::move(socket), ctx},
             onConnect_(onConnect),
             onMessage_(onMessage),
             onDisconnect_(onDisconnect),
-            onSend_(onSend) {}
+            onSend_(onSend),
+            session_id_(generateRandomString(10)) {}
 
     void Init() {
         boost::beast::get_lowest_layer(ws_).expires_never();
@@ -39,6 +57,17 @@ public:
                 OnTlsHandshake(ec, self);
             });
     }
+
+    void Close(
+        std::function<void (boost::system::error_code)> onClose = nullptr
+    ) {
+        closed_ = true;
+        ws_.async_close(boost::beast::websocket::close_code::none, [this, onClose](auto ec){
+            if (onClose != nullptr) {
+                onClose(ec);
+            }
+        });
+    }
 private:
     void OnTlsHandshake(
         const boost::system::error_code& ec,
@@ -47,7 +76,7 @@ private:
         if (ec) {
             Log("OnTlsHandshake", ec);
             if (onConnect_) {
-                onConnect_(ec);
+                onConnect_(ec, session_id_);
             }
             return;
         }
@@ -64,13 +93,13 @@ private:
         if (ec) {
             Log("OnWsHandshake", ec);
             if (onConnect_) {
-                onConnect_(ec);
+                onConnect_(ec, session_id_);
             }
             return;
         }
         ws_.text(true);
         if (onConnect_) {
-            onConnect_(ec);
+            onConnect_(ec, session_id_);
         }
         ListenToIncomingMessage(ec);
     }
@@ -80,7 +109,7 @@ private:
     ) {
         if (ec == boost::asio::error::operation_aborted) {
             if (onDisconnect_ && !closed_) {
-                onDisconnect_(ec);
+                onDisconnect_(ec, session_id_);
             }
             return;
         }
@@ -102,7 +131,7 @@ private:
             return;
         }
         if (onMessage_) {
-            auto messages = onMessage_(ec, boost::beast::buffers_to_string(buffer_.data()));
+            auto messages = onMessage_(ec, session_id_, boost::beast::buffers_to_string(buffer_.data()));
             for (const auto& msg : messages) {
                 SendMessage(msg);
             }
@@ -118,7 +147,7 @@ private:
                 Log("Send", ec);
                 return;
             }
-            onSend_(ec);
+            onSend_(ec, session_id_);
         });
     }
     void Log(std::string_view ref, const boost::system::error_code& ec) {
@@ -129,12 +158,14 @@ private:
     }
 
     WebSocketStream ws_;
-    std::function<void (boost::system::error_code)> onConnect_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onConnect_ {nullptr};
     std::function<std::vector<std::string> (boost::system::error_code,
-                                            std::string&&)> onMessage_ {nullptr};
-    std::function<void (boost::system::error_code)> onDisconnect_ {nullptr};
-    std::function<void (boost::system::error_code)> onSend_ {nullptr};
+                                            std::string&&,
+                                            const std::string&)> onMessage_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onDisconnect_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onSend_ {nullptr};
     bool closed_{false};
+    std::string session_id_;
     
     boost::beast::flat_buffer buffer_;
 };
@@ -150,11 +181,12 @@ public:
     ) : ioc_(ioc), ctx_(ctx), acceptor_(std::move(acceptor)), endpoint_(std::move(endpoint)) {}
 
     void Init(
-        std::function<void (boost::system::error_code)> onConnect = nullptr,
+        std::function<void (boost::system::error_code, const std::string&)> onConnect = nullptr,
         std::function<std::vector<std::string> (boost::system::error_code,
-                                                std::string&&)> onMessage = nullptr,
-        std::function<void (boost::system::error_code)> onDisconnect = nullptr,
-        std::function<void (boost::system::error_code)> onSend = nullptr) {
+                                                std::string&&,
+                                                const std::string&)> onMessage = nullptr,
+        std::function<void (boost::system::error_code, const std::string&)> onDisconnect = nullptr,
+        std::function<void (boost::system::error_code, const std::string&)> onSend = nullptr) {
         onConnect_ = onConnect;
         onDisconnect_ = onDisconnect;
         onMessage_ = onMessage;
@@ -223,11 +255,12 @@ private:
                 << std::endl;
     }
 
-    std::function<void (boost::system::error_code)> onConnect_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onConnect_ {nullptr};
     std::function<std::vector<std::string> (boost::system::error_code,
-                                            std::string&&)> onMessage_ {nullptr};
-    std::function<void (boost::system::error_code)> onDisconnect_ {nullptr};
-    std::function<void (boost::system::error_code)> onSend_ {nullptr};
+                                            std::string&&,
+                                            const std::string&)> onMessage_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onDisconnect_ {nullptr};
+    std::function<void (boost::system::error_code, const std::string&)> onSend_ {nullptr};
 
     boost::asio::ip::tcp::acceptor acceptor_;
     boost::asio::ip::tcp::endpoint endpoint_;
