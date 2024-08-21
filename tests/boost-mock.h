@@ -74,6 +74,7 @@ public:
     inline static boost::system::error_code writeEc = {};
     inline static boost::system::error_code readEc = {};
     inline static boost::system::error_code closeEc = {};
+    inline static boost::system::error_code acceptEc = {};
     inline static std::string readBuffer = {};
 
     template<typename HandshakeHandler>
@@ -169,6 +170,26 @@ public:
             },
             handler,
             this
+        );
+    }
+
+    template<typename AcceptHandler>
+    void async_accept(
+        AcceptHandler handler
+    ) {
+        boost::asio::async_initiate<
+                AcceptHandler,
+                void(boost::system::error_code)>(
+            [](auto&& handler, auto&& ex) {
+                boost::asio::post(
+                    ex,
+                    [handler = std::move(handler)]() {
+                        handler(MockWebsocketStream::acceptEc);
+                    }
+                );
+            },
+            handler,
+            this->get_executor()
         );
     }
 

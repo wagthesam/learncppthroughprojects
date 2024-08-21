@@ -181,6 +181,10 @@ public:
         boost::asio::ip::tcp::endpoint& endpoint
     ) : ioc_(ioc), ctx_(ctx), acceptor_(std::move(acceptor)), endpoint_(std::move(endpoint)) {}
 
+    ~WebSocketServer() {
+        Stop();
+    }
+
     boost::system::error_code Run(
         typename Session::ConnectHandler onConnect = nullptr,
         typename Session::MessageHandler onMessage = nullptr,
@@ -206,7 +210,9 @@ public:
             Log("WebSocketServer: Could not bind to endpoint: " + ec.message());
             return ec;
         }
-        acceptor_.listen(ec);
+        acceptor_.listen(
+            boost::asio::socket_base::max_listen_connections,
+            ec);
         if (ec) {
             Log("WebSocketServer: Could not listen to endpoint: " + ec.message());
             return ec;
